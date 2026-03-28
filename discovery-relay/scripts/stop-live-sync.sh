@@ -20,3 +20,4 @@ else
 fi
 
 rm -f "$PID_FILE"
+cleanup_live_sync_workers

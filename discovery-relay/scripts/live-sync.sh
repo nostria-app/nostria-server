@@ -35,20 +35,22 @@ run_follow_local_to_remote_loop() {
     done
 }
 
-run_follow_to_local_loop() {
+run_follow_remote_to_local_loop() {
     local label="$1"
     local remote_url="$2"
+    local filter_description="$3"
+    local filter="$4"
 
     while true; do
         local since
         since=$(date +%s)
-        local filter
-        filter=$(printf '{"kinds":[10002],"since":%s}' "$since")
+        local follow_filter
+        follow_filter=$(printf "$filter" "$since")
 
-        log "[$label] following kind 10002 from $remote_url into $LOCAL_RELAY_URL since=$since"
+        log "[$label] following $filter_description from $remote_url into $LOCAL_RELAY_URL since=$since"
         set +e
         compose run --rm --no-deps "$SERVICE_NAME" \
-            --config /etc/strfry.conf download --follow "$remote_url" --filter "$filter" \
+            --config /etc/strfry.conf download --follow "$remote_url" --filter "$follow_filter" \
             | compose run --rm --no-deps -T "$SERVICE_NAME" \
                 --config /etc/strfry.conf upload "$LOCAL_RELAY_URL"
         local pipeline_exit=$?
@@ -71,7 +73,7 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-log "Live sync supervisor starting for Coracle, Purple Pages, Primal, and Damus"
+log "Live sync supervisor starting for Coracle, Purple Pages, Primal, Damus, discovery.eu, and discovery.us"
 
 if ! relay_running; then
     log "Starting $SERVICE_NAME before starting live sync"
@@ -84,10 +86,16 @@ child_pids+=("$!")
 run_follow_local_to_remote_loop purplepages wss://purplepag.es/ &
 child_pids+=("$!")
 
-run_follow_to_local_loop primal wss://relay.primal.net/ &
+run_follow_remote_to_local_loop primal wss://relay.primal.net/ "kind 10002" '{"kinds":[10002],"since":%s}' &
 child_pids+=("$!")
 
-run_follow_to_local_loop damus wss://relay.damus.io/ &
+run_follow_remote_to_local_loop damus wss://relay.damus.io/ "kind 10002" '{"kinds":[10002],"since":%s}' &
+child_pids+=("$!")
+
+run_follow_remote_to_local_loop discovery-eu wss://discovery.eu.nostria.app/ "all events" '{"since":%s}' &
+child_pids+=("$!")
+
+run_follow_remote_to_local_loop discovery-us wss://discovery.us.nostria.app/ "all events" '{"since":%s}' &
 child_pids+=("$!")
 
 wait

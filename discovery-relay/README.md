@@ -182,8 +182,10 @@ Live stream rules:
 - local relay to `purplepag.es`: `strfry download --follow ws://strfry-relay:7777 --filter '{"since":...}' | strfry upload wss://purplepag.es/`
 - `relay.primal.net` to local relay: `strfry download --follow --filter '{"kinds":[10002],"since":...}' | strfry upload ws://strfry-relay:7777`
 - `relay.damus.io` to local relay: same as above
+- `discovery.eu.nostria.app` to local relay: `strfry download --follow --filter '{"since":...}' | strfry upload ws://strfry-relay:7777`
+- `discovery.us.nostria.app` to local relay: same as above
 
-That means local writes are mirrored upstream to Coracle and Purple Pages, while Primal and Damus are only followed for new kind-`10002` events and then written into the local relay over websocket.
+That means local writes are mirrored upstream to Coracle and Purple Pages, Primal and Damus are only followed for new kind-`10002` events, and both discovery relays are followed for all new events and written into the local relay over websocket.
 
 Stop the background live sync supervisor:
 

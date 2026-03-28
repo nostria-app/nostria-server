@@ -20,6 +20,8 @@ if ! relay_running; then
     compose up -d "$SERVICE_NAME" >/dev/null
 fi
 
+cleanup_live_sync_workers
+
 nohup bash "$SCRIPT_DIR/live-sync.sh" >> "$LIVE_SYNC_LOG_FILE" 2>&1 &
 new_pid=$!
 echo "$new_pid" > "$LIVE_SYNC_PID_FILE"

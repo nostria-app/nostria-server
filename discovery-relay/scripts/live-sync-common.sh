@@ -5,6 +5,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
 SERVICE_NAME="strfry-relay"
+COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-$(basename "$PROJECT_DIR")}
 DATA_ROOT="/mnt/data/openresist/discovery-relay"
 LOG_DIR="$DATA_ROOT/log"
 STATE_DIR="$DATA_ROOT/sync"
@@ -38,6 +39,22 @@ compose() {
 
 relay_running() {
     compose ps --services --filter status=running | grep -qx "$SERVICE_NAME"
+}
+
+cleanup_live_sync_workers() {
+    local worker_ids
+
+    if ! command -v docker >/dev/null 2>&1; then
+        return
+    fi
+
+    worker_ids=$(docker ps -aq \
+        --filter "name=${COMPOSE_PROJECT_NAME}_${SERVICE_NAME}_run_" \
+        --filter "status=running")
+
+    if [[ -n "$worker_ids" ]]; then
+        docker rm -f $worker_ids >/dev/null
+    fi
 }
 
 get_live_sync_pid_file() {
