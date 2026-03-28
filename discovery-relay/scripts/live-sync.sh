@@ -6,6 +6,7 @@ source "$SCRIPT_DIR/live-sync-common.sh"
 
 RETRY_SLEEP_SECONDS=${LIVE_SYNC_RETRY_SLEEP_SECONDS:-5}
 LOCAL_RELAY_URL=${LOCAL_RELAY_URL:-ws://strfry-relay:7777}
+DISCOVERY_FILTER_TEMPLATE='{"kinds":[3,10002],"since":%s}'
 
 log() {
     printf '[%s] %s\n' "$(date -Is)" "$*"
@@ -14,14 +15,16 @@ log() {
 run_follow_local_to_remote_loop() {
     local label="$1"
     local remote_url="$2"
+    local filter_description="${3:-all events}"
+    local filter_template="${4:-{\"since\":%s}}"
 
     while true; do
         local since
         since=$(date +%s)
         local filter
-        filter=$(printf '{"since":%s}' "$since")
+        filter=$(printf "$filter_template" "$since")
 
-        log "[$label] following local relay into $remote_url since=$since"
+        log "[$label] following local relay $filter_description into $remote_url since=$since"
         set +e
         compose run --rm --no-deps "$SERVICE_NAME" \
             --config /etc/strfry.conf download --follow "$LOCAL_RELAY_URL" --filter "$filter" \
@@ -73,7 +76,7 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-log "Live sync supervisor starting for Coracle, Purple Pages, Primal, Damus, discovery.eu, and discovery.us"
+log "Live sync supervisor starting for Coracle, Purple Pages, Primal, Damus, discovery.eu, and discovery.us in both configured directions"
 
 if ! relay_running; then
     log "Starting $SERVICE_NAME before starting live sync"
@@ -86,16 +89,22 @@ child_pids+=("$!")
 run_follow_local_to_remote_loop purplepages wss://purplepag.es/ &
 child_pids+=("$!")
 
+run_follow_local_to_remote_loop discovery-eu-up wss://discovery.eu.nostria.app/ "for kinds 3 and 10002" "$DISCOVERY_FILTER_TEMPLATE" &
+child_pids+=("$!")
+
+run_follow_local_to_remote_loop discovery-us-up wss://discovery.us.nostria.app/ "for kinds 3 and 10002" "$DISCOVERY_FILTER_TEMPLATE" &
+child_pids+=("$!")
+
 run_follow_remote_to_local_loop primal wss://relay.primal.net/ "kind 10002" '{"kinds":[10002],"since":%s}' &
 child_pids+=("$!")
 
 run_follow_remote_to_local_loop damus wss://relay.damus.io/ "kind 10002" '{"kinds":[10002],"since":%s}' &
 child_pids+=("$!")
 
-run_follow_remote_to_local_loop discovery-eu wss://discovery.eu.nostria.app/ "all events" '{"since":%s}' &
+run_follow_remote_to_local_loop discovery-eu-down wss://discovery.eu.nostria.app/ "kinds 3 and 10002" "$DISCOVERY_FILTER_TEMPLATE" &
 child_pids+=("$!")
 
-run_follow_remote_to_local_loop discovery-us wss://discovery.us.nostria.app/ "all events" '{"since":%s}' &
+run_follow_remote_to_local_loop discovery-us-down wss://discovery.us.nostria.app/ "kinds 3 and 10002" "$DISCOVERY_FILTER_TEMPLATE" &
 child_pids+=("$!")
 
 wait

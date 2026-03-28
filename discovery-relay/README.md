@@ -63,7 +63,7 @@ cd /home/blockcore/src/nostria/nostria-server/discovery-relay
 ./scripts/initial-sync.sh
 ```
 
-This imports full event history from the configured upstream relays where available. It also pulls kind `10002` from Coracle as an extra relay-list source.
+This imports discovery relay history as kinds `3` and `10002` only from the configured discovery relays. It also pulls kind `10002` from Coracle as an extra relay-list source.
 
 Current upstreams:
 
@@ -75,7 +75,7 @@ Current upstreams:
 - `wss://discovery.us.nostria.app/`
 - `wss://discovery.af.nostria.app/`
 
-This is a full sync job, not a discovery-only sync. Expect it to run for a long time and use substantial network, CPU, and disk I/O.
+This is a multi-relay historical sync job, but discovery relay imports are limited to kinds `3` and `10002`. Expect it to run for a long time and use substantial network, CPU, and disk I/O.
 
 For a targeted EU relay backfill, run:
 
@@ -84,7 +84,7 @@ cd /home/blockcore/src/nostria/nostria-server/discovery-relay
 ./scripts/sync-discovery-eu.sh
 ```
 
-That script prints total-event and kind-`10002` counts before and after the run, stops the live relay during sync, and restores it on exit.
+That script prints total-event, discovery-filter, kind-`3`, and kind-`10002` counts before and after the run, stops the live relay during sync, and restores it on exit.
 
 By default it keeps retrying the EU down-sync after disconnects until it sees no new events for 2 consecutive attempts. You can tune that with:
 
@@ -180,12 +180,14 @@ Live stream rules:
 
 - local relay to `indexer.coracle.social`: `strfry download --follow ws://strfry-relay:7777 --filter '{"since":...}' | strfry upload wss://indexer.coracle.social/`
 - local relay to `purplepag.es`: `strfry download --follow ws://strfry-relay:7777 --filter '{"since":...}' | strfry upload wss://purplepag.es/`
+- local relay to `discovery.eu.nostria.app`: `strfry download --follow ws://strfry-relay:7777 --filter '{"kinds":[3,10002],"since":...}' | strfry upload wss://discovery.eu.nostria.app/`
+- local relay to `discovery.us.nostria.app`: same as above
 - `relay.primal.net` to local relay: `strfry download --follow --filter '{"kinds":[10002],"since":...}' | strfry upload ws://strfry-relay:7777`
 - `relay.damus.io` to local relay: same as above
-- `discovery.eu.nostria.app` to local relay: `strfry download --follow --filter '{"since":...}' | strfry upload ws://strfry-relay:7777`
+- `discovery.eu.nostria.app` to local relay: `strfry download --follow --filter '{"kinds":[3,10002],"since":...}' | strfry upload ws://strfry-relay:7777`
 - `discovery.us.nostria.app` to local relay: same as above
 
-That means local writes are mirrored upstream to Coracle and Purple Pages, Primal and Damus are only followed for new kind-`10002` events, and both discovery relays are followed for all new events and written into the local relay over websocket.
+That means local writes are mirrored upstream to Coracle and Purple Pages without a kind filter, local writes are mirrored to discovery.eu and discovery.us for kinds `3` and `10002` only, Primal and Damus are only followed for new kind-`10002` events, and both discovery relays are also followed for kinds `3` and `10002` only and written into the local relay over websocket.
 
 Stop the background live sync supervisor:
 

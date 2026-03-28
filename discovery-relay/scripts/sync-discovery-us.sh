@@ -9,6 +9,7 @@ MAX_NO_PROGRESS=${US_SYNC_MAX_NO_PROGRESS:-2}
 RETRY_SLEEP_SECONDS=${US_SYNC_RETRY_SLEEP_SECONDS:-5}
 SYNC_DOWN_BATCH_SIZE=${SYNC_DOWN_BATCH_SIZE:-500}
 SYNC_FRAME_SIZE_LIMIT=${SYNC_FRAME_SIZE_LIMIT:-}
+DISCOVERY_FILTER='{"kinds":[3,10002]}'
 
 log() {
     printf '[%s] [discovery.us] %s\n' "$(date -Is)" "$*"
@@ -101,10 +102,14 @@ fi
 wait_for_active_sync "$EXISTING_SYNC_CONTAINER"
 
 pre_sync_total=$(count_events '{}')
+pre_sync_discovery=$(count_events "$DISCOVERY_FILTER")
+pre_sync_kind3=$(count_events '{"kinds":[3]}')
 pre_sync_kind10002=$(count_events '{"kinds":[10002]}')
 
 log "Pre-sync counts:"
 log "  total:      $pre_sync_total"
+log "  discovery:  $pre_sync_discovery"
+log "  kind3:      $pre_sync_kind3"
 log "  kind10002:  $pre_sync_kind10002"
 log "Using down-batch-size=$SYNC_DOWN_BATCH_SIZE${SYNC_FRAME_SIZE_LIMIT:+ frame-size-limit=$SYNC_FRAME_SIZE_LIMIT}"
 
@@ -118,6 +123,8 @@ fi
 attempt=0
 no_progress_attempts=0
 previous_total=$pre_sync_total
+previous_discovery=$pre_sync_discovery
+previous_kind3=$pre_sync_kind3
 previous_kind10002=$pre_sync_kind10002
 
 while true; do
@@ -131,6 +138,7 @@ while true; do
         sync_args+=("--frame-size-limit=$SYNC_FRAME_SIZE_LIMIT")
     fi
     sync_args+=("--down-batch-size=$SYNC_DOWN_BATCH_SIZE")
+    sync_args+=("--filter=$DISCOVERY_FILTER")
     compose run --rm --no-deps strfry-relay \
         --config /etc/strfry.conf "${sync_args[@]}" wss://discovery.us.nostria.app/ --dir down
     sync_exit_code=$?
@@ -138,17 +146,23 @@ while true; do
     attempt_duration=$(( $(date +%s) - attempt_started_at ))
 
     current_total=$(count_events '{}')
+    current_discovery=$(count_events "$DISCOVERY_FILTER")
+    current_kind3=$(count_events '{"kinds":[3]}')
     current_kind10002=$(count_events '{"kinds":[10002]}')
     total_delta=$((current_total - previous_total))
+    discovery_delta=$((current_discovery - previous_discovery))
+    kind3_delta=$((current_kind3 - previous_kind3))
     kind10002_delta=$((current_kind10002 - previous_kind10002))
 
     log "Counts after attempt $attempt:"
     log "  total:      $current_total (delta $total_delta)"
+    log "  discovery:  $current_discovery (delta $discovery_delta)"
+    log "  kind3:      $current_kind3 (delta $kind3_delta)"
     log "  kind10002:  $current_kind10002 (delta $kind10002_delta)"
     log "  exit code:  $sync_exit_code"
     log "  duration:   ${attempt_duration}s"
 
-    if (( total_delta == 0 && kind10002_delta == 0 )); then
+    if (( discovery_delta == 0 && kind3_delta == 0 && kind10002_delta == 0 )); then
         no_progress_attempts=$((no_progress_attempts + 1))
         log "No new events imported on attempt $attempt ($no_progress_attempts/$MAX_NO_PROGRESS)."
     else
@@ -156,6 +170,8 @@ while true; do
     fi
 
     previous_total=$current_total
+    previous_discovery=$current_discovery
+    previous_kind3=$current_kind3
     previous_kind10002=$current_kind10002
 
     if (( no_progress_attempts >= MAX_NO_PROGRESS )); then
@@ -172,4 +188,6 @@ restore_relay
 
 log "Post-sync counts:"
 log "  total:      $(count_events '{}')"
+log "  discovery:  $(count_events "$DISCOVERY_FILTER")"
+log "  kind3:      $(count_events '{"kinds":[3]}')"
 log "  kind10002:  $(count_events '{"kinds":[10002]}')"

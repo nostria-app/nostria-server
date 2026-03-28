@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
+DISCOVERY_FILTER='{"kinds":[3,10002]}'
 
 get_compose_cmd() {
     if command -v docker-compose >/dev/null 2>&1; then
@@ -80,9 +81,9 @@ sync_relay() {
 
 trap 'restore_relay' EXIT
 
-sync_relay "wss://discovery.eu.nostria.app/" down
-sync_relay "wss://discovery.us.nostria.app/" down
-sync_relay "wss://discovery.af.nostria.app/" down
+sync_relay "wss://discovery.eu.nostria.app/" down "$DISCOVERY_FILTER"
+sync_relay "wss://discovery.us.nostria.app/" down "$DISCOVERY_FILTER"
+sync_relay "wss://discovery.af.nostria.app/" down "$DISCOVERY_FILTER"
 sync_relay "wss://purplepag.es/" down
 sync_relay "wss://indexer.coracle.social/" down '{"kinds":[10002]}'
 sync_relay "wss://relay.damus.io/" down
