@@ -1,26 +1,93 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "$SCRIPT_DIR/live-sync-common.sh"
 
 RETRY_SLEEP_SECONDS=${LIVE_SYNC_RETRY_SLEEP_SECONDS:-5}
-ROUTER_CONFIG="/etc/strfry-router.conf"
+LOCAL_RELAY_URL=${LOCAL_RELAY_URL:-ws://strfry-relay:7777}
 
-echo "Live router sync loop starting for indexer.coracle.social, purplepag.es, relay.primal.net, and relay.damus.io"
+log() {
+    printf '[%s] %s\n' "$(date -Is)" "$*"
+}
+
+run_follow_local_to_remote_loop() {
+    local label="$1"
+    local remote_url="$2"
+
+    while true; do
+        local since
+        since=$(date +%s)
+        local filter
+        filter=$(printf '{"since":%s}' "$since")
+
+        log "[$label] following local relay into $remote_url since=$since"
+        set +e
+        compose run --rm --no-deps "$SERVICE_NAME" \
+            --config /etc/strfry.conf download --follow "$LOCAL_RELAY_URL" --filter "$filter" \
+            | compose run --rm --no-deps -T "$SERVICE_NAME" \
+                --config /etc/strfry.conf upload "$remote_url"
+        local pipeline_exit=$?
+        set -e
+
+        log "[$label] local-follow/upload pipeline exited with code $pipeline_exit; retrying in ${RETRY_SLEEP_SECONDS}s"
+        sleep "$RETRY_SLEEP_SECONDS"
+    done
+}
+
+run_follow_to_local_loop() {
+    local label="$1"
+    local remote_url="$2"
+
+    while true; do
+        local since
+        since=$(date +%s)
+        local filter
+        filter=$(printf '{"kinds":[10002],"since":%s}' "$since")
+
+        log "[$label] following kind 10002 from $remote_url into $LOCAL_RELAY_URL since=$since"
+        set +e
+        compose run --rm --no-deps "$SERVICE_NAME" \
+            --config /etc/strfry.conf download --follow "$remote_url" --filter "$filter" \
+            | compose run --rm --no-deps -T "$SERVICE_NAME" \
+                --config /etc/strfry.conf upload "$LOCAL_RELAY_URL"
+        local pipeline_exit=$?
+        set -e
+
+        log "[$label] follow/upload pipeline exited with code $pipeline_exit; retrying in ${RETRY_SLEEP_SECONDS}s"
+        sleep "$RETRY_SLEEP_SECONDS"
+    done
+}
+
+child_pids=()
+
+cleanup() {
+    local pid
+    for pid in "${child_pids[@]:-}"; do
+        kill "$pid" >/dev/null 2>&1 || true
+    done
+    wait >/dev/null 2>&1 || true
+}
+
+trap cleanup EXIT INT TERM
+
+log "Live sync supervisor starting for Coracle, Purple Pages, Primal, and Damus"
 
 if ! relay_running; then
-    echo "Starting $SERVICE_NAME before starting live router sync"
+    log "Starting $SERVICE_NAME before starting live sync"
     compose up -d "$SERVICE_NAME" >/dev/null
 fi
 
-while true; do
-    echo "Router sync connecting at $(date -Is)"
-    compose run --rm --no-deps \
-        -v "$PROJECT_DIR/config/strfry-router.conf:$ROUTER_CONFIG:ro" \
-        "$SERVICE_NAME" \
-        --config /etc/strfry.conf router "$ROUTER_CONFIG"
-    sync_exit_code=$?
-    echo "Router sync exited with code $sync_exit_code at $(date -Is)"
-    sleep "$RETRY_SLEEP_SECONDS"
-done
+run_follow_local_to_remote_loop coracle wss://indexer.coracle.social/ &
+child_pids+=("$!")
+
+run_follow_local_to_remote_loop purplepages wss://purplepag.es/ &
+child_pids+=("$!")
+
+run_follow_to_local_loop primal wss://relay.primal.net/ &
+child_pids+=("$!")
+
+run_follow_to_local_loop damus wss://relay.damus.io/ &
+child_pids+=("$!")
+
+wait

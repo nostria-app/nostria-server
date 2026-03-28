@@ -32,7 +32,6 @@ All persistent data is stored under `/mnt/data/openresist/discovery-relay`:
 - `scripts/initial-sync.sh`: optional one-time historical sync
 - `scripts/sync-discovery-eu.sh`: targeted full down-sync from `discovery.eu.nostria.app`, with retry-until-stalled behavior
 - `scripts/sync-discovery-us.sh`: targeted full down-sync from `discovery.us.nostria.app`, with retry-until-stalled behavior
-- `config/strfry-router.conf`: live router streams for Coracle, Purple Pages, Primal, and Damus
 - `scripts/start-live-sync.sh`: starts the live router loop in the background
 - `scripts/stop-live-sync.sh`: stops the background live router loop
 - `scripts/install-sync-timer.sh`: installs a systemd timer for scheduled syncs
@@ -172,14 +171,16 @@ Start continuous live sync while keeping the local relay online:
 ./scripts/start-live-sync.sh
 ```
 
-This runs `strfry router` with these live stream rules:
+This runs websocket-only sync workers so the local relay stays online and no second process opens the LMDB database directly.
 
-- `indexer.coracle.social`: `dir = both`
-- `purplepag.es`: `dir = both`
-- `relay.primal.net`: `dir = down`, filtered to kind `10002`
-- `relay.damus.io`: `dir = down`, filtered to kind `10002`
+Live stream rules:
 
-That means local writes are mirrored upstream to Coracle and Purple Pages, while Primal and Damus are only subscribed for new kind-`10002` events.
+- local relay to `indexer.coracle.social`: `strfry download --follow ws://strfry-relay:7777 --filter '{"since":...}' | strfry upload wss://indexer.coracle.social/`
+- local relay to `purplepag.es`: `strfry download --follow ws://strfry-relay:7777 --filter '{"since":...}' | strfry upload wss://purplepag.es/`
+- `relay.primal.net` to local relay: `strfry download --follow --filter '{"kinds":[10002],"since":...}' | strfry upload ws://strfry-relay:7777`
+- `relay.damus.io` to local relay: same as above
+
+That means local writes are mirrored upstream to Coracle and Purple Pages, while Primal and Damus are only followed for new kind-`10002` events and then written into the local relay over websocket.
 
 Stop the background live router loop:
 
