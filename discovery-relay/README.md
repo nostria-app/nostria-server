@@ -32,6 +32,9 @@ All persistent data is stored under `/mnt/data/openresist/discovery-relay`:
 - `scripts/initial-sync.sh`: optional one-time historical sync
 - `scripts/sync-discovery-eu.sh`: targeted full down-sync from `discovery.eu.nostria.app`, with retry-until-stalled behavior
 - `scripts/sync-discovery-us.sh`: targeted full down-sync from `discovery.us.nostria.app`, with retry-until-stalled behavior
+- `config/strfry-router.conf`: live router streams for Coracle, Purple Pages, Primal, and Damus
+- `scripts/start-live-sync.sh`: starts the live router loop in the background
+- `scripts/stop-live-sync.sh`: stops the background live router loop
 - `scripts/install-sync-timer.sh`: installs a systemd timer for scheduled syncs
 - `systemd/openresist-discovery-sync.service`: oneshot sync job
 - `systemd/openresist-discovery-sync.timer`: daily schedule for the sync job
@@ -84,7 +87,14 @@ That script prints total-event and kind-`10002` counts before and after the run,
 By default it keeps retrying the EU down-sync after disconnects until it sees no new events for 2 consecutive attempts. You can tune that with:
 
 ```bash
-EU_SYNC_MAX_NO_PROGRESS=3 EU_SYNC_RETRY_SLEEP_SECONDS=10 ./scripts/sync-discovery-eu.sh
+SYNC_DOWN_BATCH_SIZE=500 EU_SYNC_MAX_NO_PROGRESS=3 EU_SYNC_RETRY_SLEEP_SECONDS=10 ./scripts/sync-discovery-eu.sh
+```
+
+To capture wrapper progress as well as the inner `strfry sync` logs, run it in the background and tail the dedicated log file instead of only watching Docker output:
+
+```bash
+nohup ./scripts/sync-discovery-eu.sh >> /mnt/data/openresist/discovery-relay/log/sync-discovery-eu.log 2>&1 &
+tail -f /mnt/data/openresist/discovery-relay/log/sync-discovery-eu.log
 ```
 
 For a targeted US relay backfill, run:
@@ -97,7 +107,14 @@ cd /home/blockcore/src/nostria/nostria-server/discovery-relay
 That script uses the same retry-until-stalled logic for `wss://discovery.us.nostria.app/`.
 
 ```bash
-US_SYNC_MAX_NO_PROGRESS=3 US_SYNC_RETRY_SLEEP_SECONDS=10 ./scripts/sync-discovery-us.sh
+SYNC_DOWN_BATCH_SIZE=500 US_SYNC_MAX_NO_PROGRESS=3 US_SYNC_RETRY_SLEEP_SECONDS=10 ./scripts/sync-discovery-us.sh
+```
+
+For background execution with wrapper-level progress logging:
+
+```bash
+nohup ./scripts/sync-discovery-us.sh >> /mnt/data/openresist/discovery-relay/log/sync-discovery-us.log 2>&1 &
+tail -f /mnt/data/openresist/discovery-relay/log/sync-discovery-us.log
 ```
 
 ## Scheduled Sync Job
@@ -149,10 +166,32 @@ Start or rebuild:
 ./scripts/bootstrap.sh
 ```
 
+Start continuous live sync while keeping the local relay online:
+
+```bash
+./scripts/start-live-sync.sh
+```
+
+This runs `strfry router` with these live stream rules:
+
+- `indexer.coracle.social`: `dir = both`
+- `purplepag.es`: `dir = both`
+- `relay.primal.net`: `dir = down`, filtered to kind `10002`
+- `relay.damus.io`: `dir = down`, filtered to kind `10002`
+
+That means local writes are mirrored upstream to Coracle and Purple Pages, while Primal and Damus are only subscribed for new kind-`10002` events.
+
+Stop the background live router loop:
+
+```bash
+./scripts/stop-live-sync.sh
+```
+
 View logs:
 
 ```bash
 docker-compose logs -f strfry-relay
+tail -f /mnt/data/openresist/discovery-relay/log/live-sync-router.log
 ```
 
 Check discovery data counts:

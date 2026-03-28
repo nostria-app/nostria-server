@@ -7,6 +7,12 @@ COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
 PROJECT_NAME=$(basename "$PROJECT_DIR")
 MAX_NO_PROGRESS=${EU_SYNC_MAX_NO_PROGRESS:-2}
 RETRY_SLEEP_SECONDS=${EU_SYNC_RETRY_SLEEP_SECONDS:-5}
+SYNC_DOWN_BATCH_SIZE=${SYNC_DOWN_BATCH_SIZE:-500}
+SYNC_FRAME_SIZE_LIMIT=${SYNC_FRAME_SIZE_LIMIT:-}
+
+log() {
+    printf '[%s] [discovery.eu] %s\n' "$(date -Is)" "$*"
+}
 
 get_compose_cmd() {
     if command -v docker-compose >/dev/null 2>&1; then
@@ -45,7 +51,7 @@ count_events() {
         return
     fi
 
-    compose run --rm --no-deps strfry-relay /app/strfry --config /etc/strfry.conf scan "$filter" | wc -l
+    compose run --rm --no-deps strfry-relay --config /etc/strfry.conf scan "$filter" | wc -l
 }
 
 wait_for_active_sync() {
@@ -55,7 +61,7 @@ wait_for_active_sync() {
         return
     fi
 
-    echo "Waiting for existing sync container to finish: $container_name"
+    log "Waiting for existing sync container to finish: $container_name"
     while docker ps --format '{{.Names}}' | grep -Fxq "$container_name"; do
         sleep 5
     done
@@ -76,19 +82,19 @@ restore_relay() {
         return
     fi
 
-    echo "Restoring live relay container..."
+    log "Restoring live relay container..."
     set +e
     compose up -d strfry-relay >/dev/null
     local exit_code=$?
     set -e
 
     if [[ $exit_code -ne 0 ]]; then
-        echo "WARNING: Failed to restore strfry-relay automatically" >&2
+        log "WARNING: Failed to restore strfry-relay automatically" >&2
     fi
 }
 
 if [[ "$RELAY_WAS_RUNNING" != "true" && -z "$EXISTING_SYNC_CONTAINER" ]]; then
-    echo "ERROR: strfry-relay is not running. Start it first with ./scripts/bootstrap.sh" >&2
+    log "ERROR: strfry-relay is not running. Start it first with ./scripts/bootstrap.sh" >&2
     exit 1
 fi
 
@@ -97,14 +103,15 @@ wait_for_active_sync "$EXISTING_SYNC_CONTAINER"
 pre_sync_total=$(count_events '{}')
 pre_sync_kind10002=$(count_events '{"kinds":[10002]}')
 
-echo "Pre-sync counts:"
-echo "  total:   $pre_sync_total"
-echo "  kind10002: $pre_sync_kind10002"
+log "Pre-sync counts:"
+log "  total:      $pre_sync_total"
+log "  kind10002:  $pre_sync_kind10002"
+log "Using down-batch-size=$SYNC_DOWN_BATCH_SIZE${SYNC_FRAME_SIZE_LIMIT:+ frame-size-limit=$SYNC_FRAME_SIZE_LIMIT}"
 
 trap 'restore_relay' EXIT
 
 if relay_running; then
-    echo "Stopping relay during discovery.eu sync..."
+    log "Stopping relay during discovery.eu sync..."
     compose stop strfry-relay >/dev/null
 fi
 
@@ -115,27 +122,35 @@ previous_kind10002=$pre_sync_kind10002
 
 while true; do
     attempt=$((attempt + 1))
+    attempt_started_at=$(date +%s)
 
-    echo "Sync attempt $attempt from wss://discovery.eu.nostria.app/..."
+    log "Sync attempt $attempt from wss://discovery.eu.nostria.app/..."
     set +e
+    sync_args=(sync)
+    if [[ -n "$SYNC_FRAME_SIZE_LIMIT" ]]; then
+        sync_args+=("--frame-size-limit=$SYNC_FRAME_SIZE_LIMIT")
+    fi
+    sync_args+=("--down-batch-size=$SYNC_DOWN_BATCH_SIZE")
     compose run --rm --no-deps strfry-relay \
-        --config /etc/strfry.conf sync wss://discovery.eu.nostria.app/ --dir down
+        --config /etc/strfry.conf "${sync_args[@]}" wss://discovery.eu.nostria.app/ --dir down
     sync_exit_code=$?
     set -e
+    attempt_duration=$(( $(date +%s) - attempt_started_at ))
 
     current_total=$(count_events '{}')
     current_kind10002=$(count_events '{"kinds":[10002]}')
     total_delta=$((current_total - previous_total))
     kind10002_delta=$((current_kind10002 - previous_kind10002))
 
-    echo "Counts after attempt $attempt:"
-    echo "  total:      $current_total (delta $total_delta)"
-    echo "  kind10002:  $current_kind10002 (delta $kind10002_delta)"
-    echo "  exit code:  $sync_exit_code"
+    log "Counts after attempt $attempt:"
+    log "  total:      $current_total (delta $total_delta)"
+    log "  kind10002:  $current_kind10002 (delta $kind10002_delta)"
+    log "  exit code:  $sync_exit_code"
+    log "  duration:   ${attempt_duration}s"
 
     if (( total_delta == 0 && kind10002_delta == 0 )); then
         no_progress_attempts=$((no_progress_attempts + 1))
-        echo "No new events imported on attempt $attempt ($no_progress_attempts/$MAX_NO_PROGRESS)."
+        log "No new events imported on attempt $attempt ($no_progress_attempts/$MAX_NO_PROGRESS)."
     else
         no_progress_attempts=0
     fi
@@ -144,17 +159,17 @@ while true; do
     previous_kind10002=$current_kind10002
 
     if (( no_progress_attempts >= MAX_NO_PROGRESS )); then
-        echo "EU sync appears exhausted or stalled after $attempt attempts."
+        log "EU sync appears exhausted or stalled after $attempt attempts."
         break
     fi
 
-    echo "Retrying in $RETRY_SLEEP_SECONDS seconds..."
+    log "Retrying in $RETRY_SLEEP_SECONDS seconds..."
     sleep "$RETRY_SLEEP_SECONDS"
 done
 
-echo "Sync loop complete. Restoring relay..."
+log "Sync loop complete. Restoring relay..."
 restore_relay
 
-echo "Post-sync counts:"
-echo "  total:   $(count_events '{}')"
-echo "  kind10002: $(count_events '{"kinds":[10002]}')"
+log "Post-sync counts:"
+log "  total:      $(count_events '{}')"
+log "  kind10002:  $(count_events '{"kinds":[10002]}')"
