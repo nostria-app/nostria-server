@@ -1,0 +1,13 @@
+[Unit]
+Description=OpenResist discovery relay sync job
+After=docker.service network-online.target
+Wants=docker.service network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/blockcore/src/nostria/nostria-server/discovery-relay
+ExecStart=/home/blockcore/src/nostria/nostria-server/discovery-relay/scripts/initial-sync.sh
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

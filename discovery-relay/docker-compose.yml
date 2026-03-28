@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  strfry-relay:
+    build:
+      context: ../../strfry
+      dockerfile: ubuntu.Dockerfile
+    image: nostria/strfry:1.1.0-local
+    container_name: openresist-discovery-relay
+    restart: unless-stopped
+    command: ["--config", "/etc/strfry.conf", "relay"]
+    ports:
+      - "127.0.0.1:7777:7777"
+    ulimits:
+      nofile:
+        soft: 500000
+        hard: 500000
+    volumes:
+      - ./config/strfry.conf:/etc/strfry.conf:ro
+      - /mnt/data/openresist/discovery-relay/db:/var/lib/strfry/db
+      - /mnt/data/openresist/discovery-relay/log:/var/log/strfry
