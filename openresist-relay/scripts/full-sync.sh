@@ -12,6 +12,7 @@ fi
 
 MAX_NO_PROGRESS=${SYNC_MAX_NO_PROGRESS:-2}
 RETRY_SLEEP_SECONDS=${SYNC_RETRY_SLEEP_SECONDS:-5}
+SYNC_DOWN_BATCH_SIZE=${SYNC_DOWN_BATCH_SIZE:-500}
 LABEL=$(target_label "$TARGET")
 RELAY_URL=$(sync_url_for_target "$TARGET")
 RELAY_WAS_RUNNING=false
@@ -38,6 +39,7 @@ no_progress_attempts=0
 
 echo "$LABEL full sync starting from $RELAY_URL"
 echo "Pre-sync total: $pre_sync_total"
+echo "$LABEL using down-batch-size=$SYNC_DOWN_BATCH_SIZE"
 
 if [[ "$RELAY_WAS_RUNNING" == "true" ]]; then
     echo "Stopping relay during $LABEL full sync to avoid LMDB write-lock contention"

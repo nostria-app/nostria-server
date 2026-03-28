@@ -78,8 +78,17 @@ target_label() {
 run_sync_once() {
     local target="$1"
     local relay_url
+    local sync_args=(sync)
     relay_url=$(sync_url_for_target "$target")
 
+    if [[ -n "${SYNC_FRAME_SIZE_LIMIT:-}" ]]; then
+        sync_args+=("--frame-size-limit=${SYNC_FRAME_SIZE_LIMIT}")
+    fi
+
+    if [[ -n "${SYNC_DOWN_BATCH_SIZE:-}" ]]; then
+        sync_args+=("--down-batch-size=${SYNC_DOWN_BATCH_SIZE}")
+    fi
+
     compose run --rm --no-deps "$SERVICE_NAME" \
-        --config /etc/strfry.conf sync "$relay_url" --dir down
+        --config /etc/strfry.conf "${sync_args[@]}" "$relay_url" --dir down
 }

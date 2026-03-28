@@ -64,6 +64,12 @@ Run the full catch-up from EU only:
 ./scripts/full-sync.sh eu
 ```
 
+By default, full sync now requests `500` events per DOWN batch instead of Strfry's built-in default of `50`. You can override that for testing:
+
+```bash
+SYNC_DOWN_BATCH_SIZE=1000 ./scripts/full-sync.sh eu
+```
+
 Run the full catch-up from US only:
 
 ```bash
@@ -102,6 +108,12 @@ View logs:
 docker-compose logs -f openresist-relay
 tail -f /mnt/data/openresist/relay/log/cutover-sync.log
 tail -f /mnt/data/openresist/relay/log/live-sync-router.log
+```
+
+Check current sync status:
+
+```bash
+./scripts/sync-status.sh
 ```
 
 Check total event count:
