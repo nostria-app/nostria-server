@@ -6,6 +6,8 @@ Setup for self-hosted Nostria infrastructure services on a physical Ubuntu serve
 
 The discovery relay deployment for `indexer.openresist.com` lives in `discovery-relay/`.
 
+It is also exposed on `discovery.eu.nostria.app` and `discovery.us.nostria.app` through the same local origin.
+
 It builds the Docker image locally from the sibling `strfry/` workspace folder and stores all persistent data under `/mnt/data/openresist/discovery-relay` by default.
 
 Quick start:
@@ -32,6 +34,8 @@ See `discovery-relay/README.md` for the full setup and operations guide.
 
 The account relay deployment for `relay.openresist.com` lives in `openresist-relay/`.
 
+It is also exposed on `ribo.eu.nostria.app` and `ribo.us.nostria.app` through the same local origin.
+
 It builds from the sibling `strfry/` workspace folder and stores persistent data under `/mnt/data/openresist/relay`.
 
 Quick start:
@@ -42,6 +46,6 @@ cd openresist-relay
 nohup ./scripts/start-cutover-sync.sh >> /mnt/data/openresist/relay/log/cutover-sync.log 2>&1 &
 ```
 
-The relay listens locally on `127.0.0.1:7778` and the Cloudflare Tunnel hostname `relay.openresist.com` should point at that origin.
+The relay listens locally on `127.0.0.1:7778` and the Cloudflare Tunnel hostnames `relay.openresist.com`, `ribo.eu.nostria.app`, and `ribo.us.nostria.app` should point at that origin.
 
 See `openresist-relay/README.md` for the full setup, sync, and operations guide.

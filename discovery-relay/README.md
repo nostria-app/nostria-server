@@ -2,6 +2,11 @@
 
 This deploys a dedicated `strfry` discovery relay for `indexer.openresist.com` on the current Ubuntu server.
 
+It is also intended to answer on these alias hostnames through the same Cloudflare Tunnel origin:
+
+- `discovery.eu.nostria.app`
+- `discovery.us.nostria.app`
+
 The helper scripts auto-detect whether to use `docker compose` or legacy `docker-compose`.
 
 ## What It Runs
@@ -113,6 +118,8 @@ No local TLS is configured here.
 Point Cloudflare Tunnel at the local origin:
 
 - Hostname: `indexer.openresist.com`
+- Hostname: `discovery.eu.nostria.app`
+- Hostname: `discovery.us.nostria.app`
 - Service: `http://127.0.0.1:7777`
 
 WebSockets and NIP-11 responses are both served by `strfry` on that port.
@@ -128,6 +135,8 @@ Optional overrides:
 
 ```bash
 sudo ./scripts/update-cloudflared-ingress.sh --hostname indexer.openresist.com --service http://127.0.0.1:7777
+sudo ./scripts/update-cloudflared-ingress.sh --hostname discovery.eu.nostria.app --service http://127.0.0.1:7777
+sudo ./scripts/update-cloudflared-ingress.sh --hostname discovery.us.nostria.app --service http://127.0.0.1:7777
 ```
 
 ## Operations

@@ -2,6 +2,11 @@
 
 This deploys a dedicated local `strfry` account relay for `relay.openresist.com` on the current Ubuntu server.
 
+It is also intended to answer on these alias hostnames through the same Cloudflare Tunnel origin:
+
+- `ribo.eu.nostria.app`
+- `ribo.us.nostria.app`
+
 The image is built locally from the workspace copy of `../../strfry`, which is expected to be checked out at Strfry `1.1.0`.
 
 ## What It Runs
@@ -13,7 +18,7 @@ This relay is intended to replace the previous split relay topology and later sy
 - `wss://ribo.us.nostria.app/`
 - `wss://ribo.eu.nostria.app/`
 
-The Cloudflare Tunnel hostname `relay.openresist.com` now maps to `http://127.0.0.1:7778` on this server.
+The Cloudflare Tunnel hostnames `relay.openresist.com`, `ribo.eu.nostria.app`, and `ribo.us.nostria.app` now map to `http://127.0.0.1:7778` on this server.
 
 Sync is staged in two phases:
 
@@ -47,6 +52,8 @@ This will:
 Point Cloudflare Tunnel at the local origin:
 
 - Hostname: `relay.openresist.com`
+- Hostname: `ribo.eu.nostria.app`
+- Hostname: `ribo.us.nostria.app`
 - Service: `http://127.0.0.1:7778`
 
 If the ingress entry ever needs to be recreated, run:
@@ -54,6 +61,8 @@ If the ingress entry ever needs to be recreated, run:
 ```bash
 cd /home/blockcore/src/nostria/nostria-server
 sudo ./scripts/update-cloudflared-ingress.sh --hostname relay.openresist.com --service http://127.0.0.1:7778
+sudo ./scripts/update-cloudflared-ingress.sh --hostname ribo.eu.nostria.app --service http://127.0.0.1:7778
+sudo ./scripts/update-cloudflared-ingress.sh --hostname ribo.us.nostria.app --service http://127.0.0.1:7778
 ```
 
 ## Operations
