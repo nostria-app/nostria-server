@@ -32,11 +32,14 @@ All persistent data is stored under `/mnt/data/openresist/discovery-relay`:
 - `scripts/initial-sync.sh`: optional one-time historical sync
 - `scripts/sync-discovery-eu.sh`: targeted full down-sync from `discovery.eu.nostria.app`, with retry-until-stalled behavior
 - `scripts/sync-discovery-us.sh`: targeted full down-sync from `discovery.us.nostria.app`, with retry-until-stalled behavior
-- `scripts/start-live-sync.sh`: starts the live router loop in the background
-- `scripts/stop-live-sync.sh`: stops the background live router loop
+- `scripts/start-live-sync.sh`: starts the live websocket sync supervisor in the background
+- `scripts/stop-live-sync.sh`: stops the background live websocket sync supervisor
+- `scripts/live-sync-status.sh`: shows relay state, live sync status, worker counts, and recent live-sync logs
 - `scripts/install-sync-timer.sh`: installs a systemd timer for scheduled syncs
+- `scripts/install-live-sync-service.sh`: installs a persistent systemd service for the live-sync supervisor
 - `systemd/openresist-discovery-sync.service`: oneshot sync job
 - `systemd/openresist-discovery-sync.timer`: daily schedule for the sync job
+- `systemd/openresist-discovery-live-sync.service`: persistent live-sync supervisor
 
 ## Start
 
@@ -182,7 +185,7 @@ Live stream rules:
 
 That means local writes are mirrored upstream to Coracle and Purple Pages, while Primal and Damus are only followed for new kind-`10002` events and then written into the local relay over websocket.
 
-Stop the background live router loop:
+Stop the background live sync supervisor:
 
 ```bash
 ./scripts/stop-live-sync.sh
@@ -192,7 +195,21 @@ View logs:
 
 ```bash
 docker-compose logs -f strfry-relay
-tail -f /mnt/data/openresist/discovery-relay/log/live-sync-router.log
+tail -f /mnt/data/openresist/discovery-relay/log/live-sync.log
+```
+
+Check live sync status:
+
+```bash
+bash ./scripts/live-sync-status.sh
+```
+
+Install persistent live-sync supervision with systemd:
+
+```bash
+sudo bash ./scripts/install-live-sync-service.sh
+systemctl status openresist-discovery-live-sync.service
+journalctl -u openresist-discovery-live-sync.service -n 100
 ```
 
 Check discovery data counts:

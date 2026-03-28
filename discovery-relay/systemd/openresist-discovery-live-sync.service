@@ -1,0 +1,15 @@
+[Unit]
+Description=OpenResist discovery relay live sync supervisor
+After=docker.service network-online.target
+Wants=docker.service network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/blockcore/src/nostria/nostria-server/discovery-relay
+ExecStart=/bin/bash /home/blockcore/src/nostria/nostria-server/discovery-relay/scripts/live-sync.sh
+Restart=always
+RestartSec=5
+Nice=10
+
+[Install]
+WantedBy=multi-user.target
