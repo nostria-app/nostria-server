@@ -1,4 +1,4 @@
-# nostria-server
+# Nostria Server
 
 Setup for self-hosted Nostria infrastructure services on a physical Ubuntu server.
 
