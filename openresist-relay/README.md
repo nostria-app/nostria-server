@@ -60,9 +60,11 @@ If the ingress entry ever needs to be recreated, run:
 
 ```bash
 cd /home/blockcore/src/nostria/nostria-server
-sudo ./scripts/update-cloudflared-ingress.sh --hostname relay.openresist.com --service http://127.0.0.1:7778
-sudo ./scripts/update-cloudflared-ingress.sh --hostname ribo.eu.nostria.app --service http://127.0.0.1:7778
-sudo ./scripts/update-cloudflared-ingress.sh --hostname ribo.us.nostria.app --service http://127.0.0.1:7778
+sudo ./scripts/update-cloudflared-ingress.sh \
+	--hostname relay.openresist.com \
+	--hostname ribo.eu.nostria.app \
+	--hostname ribo.us.nostria.app \
+	--service http://127.0.0.1:7778
 ```
 
 ## Operations

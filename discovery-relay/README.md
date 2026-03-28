@@ -134,9 +134,11 @@ sudo ./scripts/update-cloudflared-ingress.sh
 Optional overrides:
 
 ```bash
-sudo ./scripts/update-cloudflared-ingress.sh --hostname indexer.openresist.com --service http://127.0.0.1:7777
-sudo ./scripts/update-cloudflared-ingress.sh --hostname discovery.eu.nostria.app --service http://127.0.0.1:7777
-sudo ./scripts/update-cloudflared-ingress.sh --hostname discovery.us.nostria.app --service http://127.0.0.1:7777
+sudo ./scripts/update-cloudflared-ingress.sh \
+	--hostname indexer.openresist.com \
+	--hostname discovery.eu.nostria.app \
+	--hostname discovery.us.nostria.app \
+	--service http://127.0.0.1:7777
 ```
 
 ## Operations
