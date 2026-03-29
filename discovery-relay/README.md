@@ -176,6 +176,8 @@ Start continuous live sync while keeping the local relay online:
 
 This runs websocket-only sync workers so the local relay stays online and no second process opens the LMDB database directly.
 
+While the live-sync supervisor is running, it also checks that the `strfry-relay` container stays up and will restart it automatically if it is stopped.
+
 Live stream rules:
 
 - local relay to `indexer.coracle.social`: `strfry download --follow ws://strfry-relay:7777 --filter '{"since":...}' | strfry upload wss://indexer.coracle.social/`

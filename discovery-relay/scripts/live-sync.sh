@@ -12,6 +12,22 @@ log() {
     printf '[%s] %s\n' "$(date -Is)" "$*"
 }
 
+ensure_relay_running() {
+    if relay_running; then
+        return
+    fi
+
+    log "Relay container is down; starting $SERVICE_NAME"
+    compose up -d "$SERVICE_NAME" >/dev/null
+}
+
+monitor_relay_loop() {
+    while true; do
+        ensure_relay_running
+        sleep "$RETRY_SLEEP_SECONDS"
+    done
+}
+
 run_follow_local_to_remote_loop() {
     local label="$1"
     local remote_url="$2"
@@ -19,6 +35,8 @@ run_follow_local_to_remote_loop() {
     local filter_template="${4:-{\"since\":%s}}"
 
     while true; do
+        ensure_relay_running
+
         local since
         since=$(date +%s)
         local filter
@@ -45,6 +63,8 @@ run_follow_remote_to_local_loop() {
     local filter="$4"
 
     while true; do
+        ensure_relay_running
+
         local since
         since=$(date +%s)
         local follow_filter
@@ -82,6 +102,9 @@ if ! relay_running; then
     log "Starting $SERVICE_NAME before starting live sync"
     compose up -d "$SERVICE_NAME" >/dev/null
 fi
+
+monitor_relay_loop &
+child_pids+=("$!")
 
 run_follow_local_to_remote_loop coracle wss://indexer.coracle.social/ &
 child_pids+=("$!")
