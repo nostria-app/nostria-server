@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+  media-server:
+    image: ghcr.io/nostria-app/nostria-media:latest
+    container_name: openresist-media-server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      BLOSSOM_CONFIG: /app/data/config.yml
+      BLOSSOM_ADMIN_PASSWORD: ${BLOSSOM_ADMIN_PASSWORD}
+    volumes:
+      - /mnt/data/openresist/media:/app/data

@@ -49,3 +49,23 @@ nohup ./scripts/start-cutover-sync.sh >> /mnt/data/openresist/relay/log/cutover-
 The relay listens locally on `127.0.0.1:7778` and the Cloudflare Tunnel hostnames `relay.openresist.com`, `ribo.eu.nostria.app`, and `ribo.us.nostria.app` should point at that origin.
 
 See `openresist-relay/README.md` for the full setup, sync, and operations guide.
+
+## Media Server
+
+The local media server deployment lives in `media-server/`.
+
+It mirrors the tracked Blossom configuration from `nostria-infrastructure/config/media/config.yml`, uses the current upstream image `ghcr.io/nostria-app/nostria-media:latest`, listens locally on `127.0.0.1:3000`, and stores persistent data under `/mnt/data/openresist/media`.
+
+The intended public hostname for this service is `media.openresist.com`.
+
+Quick start:
+
+```bash
+cd media-server
+cp .env.example .env
+bash ./scripts/bootstrap.sh
+```
+
+Route `media.openresist.com` through Cloudflare Tunnel to `http://127.0.0.1:3000` using `scripts/update-cloudflared-ingress.sh`.
+
+See `media-server/README.md` for the full setup and operations guide.

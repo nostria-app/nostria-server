@@ -1,0 +1,94 @@
+# Override the domain thats is used in the blobs "url" field
+# By default it uses the domain the incoming HTTP request was made on
+publicDomain: "media.openresist.com"
+
+databasePath: data/sqlite.db
+
+dashboard:
+  # enable or disable the admin dashboard
+  enabled: true
+  # admin username
+  username: admin
+  # Local deployment reads this from docker-compose/.env when provided.
+  # If BLOSSOM_ADMIN_PASSWORD is unset, Blossom may generate a new password on startup.
+  password: "${BLOSSOM_ADMIN_PASSWORD}"
+
+discovery:
+  # find files by querying nostr relays
+  nostr:
+    enabled: false
+    relays:
+      - wss://relay.example.com
+  # find files by asking upstream CDNs
+  # NOTE: do not set this to your own server, it will create an infinite loop
+  upstream:
+    enabled: false
+    domains:
+      - https://cdn.example.com
+
+storage:
+  # local or s3
+  backend: local
+
+  # Immediately removes a blob when there are no owners
+  removeWhenNoOwners: true
+
+  # local storage
+  local:
+    dir: ./data/blobs
+
+  # rules are checked in descending order. if a blob matches a rule it is kept
+  # "type" (required) the type of the blob, "*" can be used to match any type
+  # "expiration" (required) time passed since last accessed
+  # "pubkeys" (optional) a list of owners
+  # any blobs not matching the rules will be removed
+  rules:
+    - type: text/*
+      expiration: 1 year
+    - type: "image/*"
+      expiration: 1 year
+    - type: "video/*"
+      expiration: 1 year
+    - type: "model/*"
+      expiration: 1 year
+    - type: "*"
+      expiration: 1 year
+
+upload:
+  enabled: true
+  requireAuth: true
+  requirePubkeyInRule: false
+  maxSize: 20971520
+
+media:
+  enabled: true
+  requireAuth: true
+  requirePubkeyInRule: false
+
+  image:
+    maxSize: 20971520
+    quality: 90
+    progressive: true
+    maxWidth: 1920
+    maxHeight: 1080
+    outputFormat: "webp"
+    maintainAspectRatio: true
+    keepExif: false
+    fps: 30
+
+  video:
+    maxSize: 157286400
+    quality: 50
+    maxHeight: 1080
+    maxFps: 30
+    format: "mp4"
+    audioCodec: "aac"
+    videoCodec: "libx264"
+
+list:
+  requireAuth: true
+  allowListOthers: false
+
+tor:
+  enabled: false
+  proxy: ""
