@@ -2,10 +2,12 @@
 
 This deploys a dedicated local `strfry` account relay for `relay.openresist.com` on the current Ubuntu server.
 
-It is also intended to answer on these alias hostnames through the same Cloudflare Tunnel origin:
+It is also intended to answer on these hostnames through the same Cloudflare Tunnel origin:
 
 - `ribo.eu.nostria.app`
 - `ribo.us.nostria.app`
+- `ribo.nostria.app`
+- `rilo.nostria.app`
 
 The image is built locally from the workspace copy of `../../strfry`, which is expected to be checked out at Strfry `1.1.0`.
 
@@ -15,10 +17,10 @@ The image is built locally from the workspace copy of `../../strfry`, which is e
 
 This relay is intended to replace the previous split relay topology and later sync with:
 
-- `wss://ribo.us.nostria.app/`
-- `wss://ribo.eu.nostria.app/`
+- `wss://ribo.nostria.app/`
+- `wss://rilo.nostria.app/`
 
-The Cloudflare Tunnel hostnames `relay.openresist.com`, `ribo.eu.nostria.app`, and `ribo.us.nostria.app` now map to `http://127.0.0.1:7778` on this server.
+The Cloudflare Tunnel hostnames `relay.openresist.com`, `ribo.eu.nostria.app`, `ribo.us.nostria.app`, `ribo.nostria.app`, and `rilo.nostria.app` now map to `http://127.0.0.1:7778` on this server.
 
 Sync is staged in two phases:
 
@@ -54,7 +56,14 @@ Point Cloudflare Tunnel at the local origin:
 - Hostname: `relay.openresist.com`
 - Hostname: `ribo.eu.nostria.app`
 - Hostname: `ribo.us.nostria.app`
+- Hostname: `ribo.nostria.app`
+- Hostname: `rilo.nostria.app`
 - Service: `http://127.0.0.1:7778`
+
+For third-party WebSocket compatibility, keep the legacy hostnames proxied directly through Cloudflare Tunnel instead of redirecting them. If you want the backend to keep seeing the canonical single-label names, set origin Host header overrides like this:
+
+- `ribo.eu.nostria.app` -> `ribo.nostria.app`
+- `ribo.us.nostria.app` -> `rilo.nostria.app`
 
 If the ingress entry ever needs to be recreated, run:
 
@@ -64,8 +73,14 @@ sudo ./scripts/update-cloudflared-ingress.sh \
 	--hostname relay.openresist.com \
 	--hostname ribo.eu.nostria.app \
 	--hostname ribo.us.nostria.app \
+	--hostname ribo.nostria.app \
+	--hostname rilo.nostria.app \
+	--http-host-header ribo.eu.nostria.app=ribo.nostria.app \
+	--http-host-header ribo.us.nostria.app=rilo.nostria.app \
 	--service http://127.0.0.1:7778
 ```
+
+Nostr/WebSocket clients should prefer `wss://ribo.nostria.app/` and `wss://rilo.nostria.app/`, but the legacy hostnames should keep proxying directly for third-party compatibility until they have migrated.
 
 ## Operations
 

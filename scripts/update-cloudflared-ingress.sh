@@ -6,6 +6,7 @@ DEFAULT_HOSTNAME=indexer.openresist.com
 TARGET_SERVICE=http://127.0.0.1:7777
 RESTART_CLOUDFLARED=true
 TARGET_HOSTNAMES=()
+HOST_HEADER_MAPPINGS=()
 
 usage() {
     cat <<'EOF'
@@ -13,6 +14,8 @@ Usage: sudo ./scripts/update-cloudflared-ingress.sh [options]
 
 Options:
     --hostname <hostname>   Hostname to route through the tunnel; repeat to add multiple hostnames
+        --http-host-header <hostname=host-header>
+                                                    Override the origin Host header for a specific hostname
   --service <url>         Local origin service URL
   --config <path>         cloudflared config file path
   --no-restart            Update the config but do not restart cloudflared
@@ -20,7 +23,8 @@ Options:
 
 Examples:
     sudo ./scripts/update-cloudflared-ingress.sh
-    sudo ./scripts/update-cloudflared-ingress.sh --hostname relay.openresist.com --hostname ribo.eu.nostria.app --hostname ribo.us.nostria.app --service http://127.0.0.1:7778
+    sudo ./scripts/update-cloudflared-ingress.sh --hostname relay.openresist.com --hostname ribo.nostria.app --hostname rilo.nostria.app --service http://127.0.0.1:7778
+    sudo ./scripts/update-cloudflared-ingress.sh --hostname ribo.eu.nostria.app --hostname ribo.us.nostria.app --service http://127.0.0.1:7778 --http-host-header ribo.eu.nostria.app=ribo.nostria.app --http-host-header ribo.us.nostria.app=rilo.nostria.app
 EOF
 }
 
@@ -28,6 +32,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --hostname)
             TARGET_HOSTNAMES+=("${2:?missing value for --hostname}")
+            shift 2
+            ;;
+        --http-host-header)
+            HOST_HEADER_MAPPINGS+=("${2:?missing value for --http-host-header}")
             shift 2
             ;;
         --service)
@@ -75,11 +83,13 @@ fi
 
 TMP_FILE=$(mktemp)
 HOSTNAME_FILE=$(mktemp)
+HOST_HEADER_FILE=$(mktemp)
 BACKUP_FILE="${CONFIG_FILE}.bak.$(date +%Y%m%d%H%M%S)"
 
 printf '%s\n' "${TARGET_HOSTNAMES[@]}" > "$HOSTNAME_FILE"
+printf '%s\n' "${HOST_HEADER_MAPPINGS[@]}" > "$HOST_HEADER_FILE"
 
-awk -v hostname_file="$HOSTNAME_FILE" -v target_service="$TARGET_SERVICE" '
+awk -v hostname_file="$HOSTNAME_FILE" -v host_header_file="$HOST_HEADER_FILE" -v target_service="$TARGET_SERVICE" '
 BEGIN {
     in_ingress = 0
     skip_target = 0
@@ -99,6 +109,24 @@ BEGIN {
     }
 
     close(hostname_file)
+
+    while ((getline line < host_header_file) > 0) {
+        if (line == "") {
+            continue
+        }
+
+        split(line, parts, "=")
+        hostname = parts[1]
+        value = substr(line, length(hostname) + 2)
+
+        if (hostname == "" || value == "") {
+            continue
+        }
+
+        target_host_headers[hostname] = value
+    }
+
+    close(host_header_file)
 }
 
 {
@@ -143,6 +171,10 @@ END {
     for (i = 1; i <= target_count; i++) {
         print "  - hostname: " target_hostname_order[i]
         print "    service: " target_service
+        if (target_hostname_order[i] in target_host_headers) {
+            print "    originRequest:"
+            print "      httpHostHeader: " target_host_headers[target_hostname_order[i]]
+        }
     }
 
     print fallback
@@ -153,10 +185,14 @@ cp "$CONFIG_FILE" "$BACKUP_FILE"
 install -m 0644 "$TMP_FILE" "$CONFIG_FILE"
 rm -f "$TMP_FILE"
 rm -f "$HOSTNAME_FILE"
+rm -f "$HOST_HEADER_FILE"
 
 echo "Updated $CONFIG_FILE"
 echo "Backup written to $BACKUP_FILE"
 echo "Configured hostnames: ${TARGET_HOSTNAMES[*]}"
+if [[ ${#HOST_HEADER_MAPPINGS[@]} -gt 0 ]]; then
+    echo "Configured origin Host header overrides: ${HOST_HEADER_MAPPINGS[*]}"
+fi
 
 if [[ "$RESTART_CLOUDFLARED" == "true" ]]; then
     systemctl restart cloudflared

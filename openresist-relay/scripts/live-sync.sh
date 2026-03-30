@@ -7,7 +7,7 @@ source "$SCRIPT_DIR/sync-common.sh"
 RETRY_SLEEP_SECONDS=${LIVE_SYNC_RETRY_SLEEP_SECONDS:-5}
 ROUTER_CONFIG="/etc/strfry-router.conf"
 
-echo "Live router sync loop starting for ribo.eu.nostria.app and ribo.us.nostria.app"
+echo "Live router sync loop starting for ribo.nostria.app and rilo.nostria.app"
 
 if relay_running; then
     echo "Stopping $SERVICE_NAME before starting live router sync"

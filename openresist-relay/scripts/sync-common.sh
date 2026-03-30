@@ -48,10 +48,10 @@ count_events() {
 sync_url_for_target() {
     case "$1" in
         eu)
-            echo "wss://ribo.eu.nostria.app/"
+            echo "wss://ribo.nostria.app/"
             ;;
         us)
-            echo "wss://ribo.us.nostria.app/"
+            echo "wss://rilo.nostria.app/"
             ;;
         *)
             echo "ERROR: unknown sync target '$1'" >&2

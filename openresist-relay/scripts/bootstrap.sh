@@ -55,4 +55,4 @@ $COMPOSE_CMD up -d --build openresist-relay
 
 echo "OpenResist relay is starting on 127.0.0.1:7778"
 echo "Cloudflare Tunnel origin should target: http://127.0.0.1:7778"
-echo "Future upstream sync targets: wss://ribo.us.nostria.app/ and wss://ribo.eu.nostria.app/"
+echo "Future upstream sync targets: wss://ribo.nostria.app/ and wss://rilo.nostria.app/"

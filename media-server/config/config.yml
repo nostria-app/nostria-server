@@ -1,6 +1,6 @@
 # Override the domain thats is used in the blobs "url" field
 # By default it uses the domain the incoming HTTP request was made on
-publicDomain: "media.openresist.com"
+publicDomain: "https://media.openresist.com"
 
 databasePath: data/sqlite.db
 

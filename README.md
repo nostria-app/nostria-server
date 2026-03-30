@@ -34,7 +34,7 @@ See `discovery-relay/README.md` for the full setup and operations guide.
 
 The account relay deployment for `relay.openresist.com` lives in `openresist-relay/`.
 
-It is also exposed on `ribo.eu.nostria.app` and `ribo.us.nostria.app` through the same local origin.
+It is also exposed on `ribo.eu.nostria.app`, `ribo.us.nostria.app`, `ribo.nostria.app`, and `rilo.nostria.app` through the same local origin.
 
 It builds from the sibling `strfry/` workspace folder and stores persistent data under `/mnt/data/openresist/relay`.
 
@@ -46,7 +46,9 @@ cd openresist-relay
 nohup ./scripts/start-cutover-sync.sh >> /mnt/data/openresist/relay/log/cutover-sync.log 2>&1 &
 ```
 
-The relay listens locally on `127.0.0.1:7778` and the Cloudflare Tunnel hostnames `relay.openresist.com`, `ribo.eu.nostria.app`, and `ribo.us.nostria.app` should point at that origin.
+The relay listens locally on `127.0.0.1:7778` and the Cloudflare Tunnel hostnames `relay.openresist.com`, `ribo.eu.nostria.app`, `ribo.us.nostria.app`, `ribo.nostria.app`, and `rilo.nostria.app` should point at that origin.
+
+Legacy relay names `ribo.eu.nostria.app` and `ribo.us.nostria.app` should be treated as compatibility hostnames, not redirects. They should remain proxied through Cloudflare Tunnel to the same relay origin so third-party WebSocket clients continue to work while clients migrate to `wss://ribo.nostria.app/` and `wss://rilo.nostria.app/`.
 
 See `openresist-relay/README.md` for the full setup, sync, and operations guide.
 
@@ -56,7 +58,7 @@ The local media server deployment lives in `media-server/`.
 
 It mirrors the tracked Blossom configuration from `nostria-infrastructure/config/media/config.yml`, uses the current upstream image `ghcr.io/nostria-app/nostria-media:latest`, listens locally on `127.0.0.1:3000`, and stores persistent data under `/mnt/data/openresist/media`.
 
-The intended public hostname for this service is `media.openresist.com`.
+The intended public hostnames for this service are `media.openresist.com`, `mibo.nostria.app`, and `milo.nostria.app`.
 
 Quick start:
 
@@ -66,6 +68,8 @@ cp .env.example .env
 bash ./scripts/bootstrap.sh
 ```
 
-Route `media.openresist.com` through Cloudflare Tunnel to `http://127.0.0.1:3000` using `scripts/update-cloudflared-ingress.sh`.
+Route `media.openresist.com`, `mibo.nostria.app`, and `milo.nostria.app` through Cloudflare Tunnel to `http://127.0.0.1:3000` using `scripts/update-cloudflared-ingress.sh`.
+
+Legacy hostnames `mibo.eu.nostria.app` and `mibo.us.nostria.app` should be handled with HTTP redirects on the `nostria.app` side to `https://mibo.nostria.app` and `https://milo.nostria.app` respectively.
 
 See `media-server/README.md` for the full setup and operations guide.
