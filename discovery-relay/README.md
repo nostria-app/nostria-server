@@ -2,10 +2,16 @@
 
 This deploys a dedicated `strfry` discovery relay for `indexer.openresist.com` on the current Ubuntu server.
 
-It is also intended to answer on these alias hostnames through the same Cloudflare Tunnel origin:
+The canonical public hostname is:
+
+- `indexer.openresist.com`
+
+Legacy compatibility hostnames are:
 
 - `discovery.eu.nostria.app`
 - `discovery.us.nostria.app`
+
+Those compatibility hostnames should now be handled by a Cloudflare Worker that proxies websocket and HTTP traffic to `https://indexer.openresist.com/`.
 
 The helper scripts auto-detect whether to use `docker compose` or legacy `docker-compose`.
 
@@ -134,29 +140,27 @@ The default schedule is daily at `03:15`. Adjust `OnCalendar` in `systemd/openre
 
 No local TLS is configured here.
 
-Point Cloudflare Tunnel at the local origin:
+Point Cloudflare Tunnel at the local origin for the canonical hostname only:
 
 - Hostname: `indexer.openresist.com`
-- Hostname: `discovery.eu.nostria.app`
-- Hostname: `discovery.us.nostria.app`
 - Service: `http://127.0.0.1:7777`
 
 WebSockets and NIP-11 responses are both served by `strfry` on that port.
 
-To update `/etc/cloudflared/config.yml` on this server, run:
+Keep `discovery.eu.nostria.app` and `discovery.us.nostria.app` on the Cloudflare side as compatibility hostnames handled by a Worker that proxies to `indexer.openresist.com`. They should not be treated as redirects because websocket clients may not follow them correctly.
+
+To update `/etc/cloudflared/config.yml` on this server for the canonical hostname, run:
 
 ```bash
 cd /home/blockcore/src/nostria/nostria-server
 sudo ./scripts/update-cloudflared-ingress.sh
 ```
 
-Optional overrides:
+If the ingress entry ever needs to be recreated explicitly, use:
 
 ```bash
 sudo ./scripts/update-cloudflared-ingress.sh \
 	--hostname indexer.openresist.com \
-	--hostname discovery.eu.nostria.app \
-	--hostname discovery.us.nostria.app \
 	--service http://127.0.0.1:7777
 ```
 
@@ -182,14 +186,10 @@ Live stream rules:
 
 - local relay to `indexer.coracle.social`: `strfry download --follow ws://strfry-relay:7777 --filter '{"since":...}' | strfry upload wss://indexer.coracle.social/`
 - local relay to `purplepag.es`: `strfry download --follow ws://strfry-relay:7777 --filter '{"since":...}' | strfry upload wss://purplepag.es/`
-- local relay to `discovery.eu.nostria.app`: `strfry download --follow ws://strfry-relay:7777 --filter '{"kinds":[3,10002],"since":...}' | strfry upload wss://discovery.eu.nostria.app/`
-- local relay to `discovery.us.nostria.app`: same as above
 - `relay.primal.net` to local relay: `strfry download --follow --filter '{"kinds":[10002],"since":...}' | strfry upload ws://strfry-relay:7777`
 - `relay.damus.io` to local relay: same as above
-- `discovery.eu.nostria.app` to local relay: `strfry download --follow --filter '{"kinds":[3,10002],"since":...}' | strfry upload ws://strfry-relay:7777`
-- `discovery.us.nostria.app` to local relay: same as above
 
-That means local writes are mirrored upstream to Coracle and Purple Pages without a kind filter, local writes are mirrored to discovery.eu and discovery.us for kinds `3` and `10002` only, Primal and Damus are only followed for new kind-`10002` events, and both discovery relays are also followed for kinds `3` and `10002` only and written into the local relay over websocket.
+That means local writes are mirrored upstream to Coracle and Purple Pages without a kind filter, while Primal and Damus are only followed for new kind-`10002` events. The previous live sync loops for `discovery.eu.nostria.app` and `discovery.us.nostria.app` were removed after those compatibility hostnames were migrated to the local server.
 
 Stop the background live sync supervisor:
 

@@ -6,7 +6,9 @@ Setup for self-hosted Nostria infrastructure services on a physical Ubuntu serve
 
 The discovery relay deployment for `indexer.openresist.com` lives in `discovery-relay/`.
 
-It is also exposed on `discovery.eu.nostria.app` and `discovery.us.nostria.app` through the same local origin.
+The canonical public hostname is `indexer.openresist.com`.
+
+Legacy discovery hostnames `discovery.eu.nostria.app` and `discovery.us.nostria.app` should now be treated as compatibility hostnames handled by a Cloudflare Worker that proxies websocket and HTTP traffic to `indexer.openresist.com`.
 
 It builds the Docker image locally from the sibling `strfry/` workspace folder and stores all persistent data under `/mnt/data/openresist/discovery-relay` by default.
 
@@ -22,7 +24,13 @@ cd discovery-relay
 
 The relay listens locally on `127.0.0.1:7777` and is intended to be exposed externally through Cloudflare Tunnel.
 
-To update the local Cloudflare Tunnel ingress config for the relay, run:
+The local tunnel only needs the canonical hostname:
+
+- `indexer.openresist.com` -> `http://127.0.0.1:7777`
+
+The compatibility hostnames `discovery.eu.nostria.app` and `discovery.us.nostria.app` should not be added to local tunnel ingress when Cloudflare is handling them with a Worker.
+
+To update the local Cloudflare Tunnel ingress config for the canonical relay hostname, run:
 
 ```bash
 sudo ./scripts/update-cloudflared-ingress.sh
