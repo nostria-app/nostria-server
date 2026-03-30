@@ -81,8 +81,6 @@ sync_relay() {
 
 trap 'restore_relay' EXIT
 
-sync_relay "wss://discovery.eu.nostria.app/" down "$DISCOVERY_FILTER"
-sync_relay "wss://discovery.us.nostria.app/" down "$DISCOVERY_FILTER"
 sync_relay "wss://discovery.af.nostria.app/" down "$DISCOVERY_FILTER"
 sync_relay "wss://purplepag.es/" down
 sync_relay "wss://indexer.coracle.social/" down '{"kinds":[10002]}'
