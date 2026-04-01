@@ -143,6 +143,35 @@ function getAbsoluteRequestUrl(req) {
   return `${req.protocol}://${req.get('host')}${req.originalUrl}`;
 }
 
+function parseAllowedOrigins(value) {
+  if (!value) {
+    return [
+      'http://localhost:4200',
+      'http://127.0.0.1:4200',
+      'https://stream.openresist.com',
+      'https://nostria.app'
+    ];
+  }
+
+  return value
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+}
+
+function applyCorsHeaders(req, res, allowedOrigins) {
+  const origin = req.get('origin');
+  if (!origin || !allowedOrigins.includes(origin)) {
+    return false;
+  }
+
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS,DELETE,PATCH');
+  return true;
+}
+
 async function fetchSubscriptionStatus(pubkey, accountApiBase) {
   const endpoint = new URL(`${pubkey}`, accountApiBase.endsWith('/') ? accountApiBase : `${accountApiBase}/`);
   const response = await fetch(endpoint, {
@@ -174,6 +203,7 @@ async function main() {
   const nostrAuthWindowSeconds = Number.parseInt(process.env.NIP98_AUTH_WINDOW_SECONDS || '60', 10);
   const dynamicEndpointTtlSeconds = Number.parseInt(process.env.DYNAMIC_ENDPOINT_TTL_SECONDS || '900', 10);
   const accountApiBase = process.env.NOSTRIA_ACCOUNT_API_BASE || 'https://api.nostria.app/api/account';
+  const allowedOrigins = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
   const janusWsUrl = process.env.JANUS_WS_URL || 'ws://janus:8188';
   const janusHttpUrl = process.env.JANUS_HTTP_URL || 'http://janus:8088/janus';
   const debugLevel = process.env.WHIP_DEBUG_LEVEL || 'info';
@@ -381,6 +411,17 @@ async function main() {
     res.redirect('/watch/');
   });
 
+  app.use((req, res, next) => {
+    applyCorsHeaders(req, res, allowedOrigins);
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+
+    next();
+  });
+
   app.get('/watch/config.json', (_req, res) => {
     const protocol = process.env.PUBLIC_JANUS_PROTOCOL || 'auto';
     const janusPath = '/janus';
@@ -454,6 +495,8 @@ async function main() {
   });
 
   app.post('/api/streams', async (req, res) => {
+    applyCorsHeaders(req, res, allowedOrigins);
+
     const authResult = await verifyNip98Request(req);
     if (!authResult.ok) {
       res.status(authResult.status).json({ success: false, message: authResult.error });

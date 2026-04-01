@@ -84,6 +84,8 @@ If you set `WHIP_ENDPOINT_TOKEN`, clients must send it as a Bearer token.
 
 `POST /api/streams` is protected by NIP-98 HTTP auth. The request must include an `Authorization: Nostr <base64-kind-27235-event>` header whose `u` tag matches the exact absolute URL and whose `method` tag is `POST`. On success, the server verifies the caller's premium status via `NOSTRIA_ACCOUNT_API_BASE/<pubkey>` and returns a fresh random WHIP endpoint and per-stream bearer token. The endpoint id is random, never derived from the Nostr pubkey, and is automatically destroyed after the stream ends or after `DYNAMIC_ENDPOINT_TTL_SECONDS` if unused.
 
+For browser-based clients hosted on another origin, set `CORS_ALLOWED_ORIGINS` to a comma-separated allowlist. The default setup allows `http://localhost:4200`, `http://127.0.0.1:4200`, `https://stream.openresist.com`, and `https://nostria.app`.
+
 Dynamic stream creation response shape:
 
 ```json
