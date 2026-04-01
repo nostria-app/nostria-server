@@ -20,7 +20,7 @@ services:
     depends_on:
       - janus
     ports:
-      - "127.0.0.1:7080:7080"
+      - "7080:7080"
     environment:
       JANUS_WS_URL: "ws://janus:8188"
       WHIP_PORT: "7080"
