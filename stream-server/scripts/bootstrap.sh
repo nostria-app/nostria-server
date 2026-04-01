@@ -87,6 +87,7 @@ render_template() {
     content=${content//__JANUS_ROOM_ID__/$(escape_sed_replacement "$WHIP_ROOM_ID")}
     content=${content//__JANUS_ROOM_DESCRIPTION__/$(escape_sed_replacement "$JANUS_ROOM_DESCRIPTION")}
     content=${content//__JANUS_ROOM_PUBLISHERS__/$(escape_sed_replacement "$JANUS_ROOM_PUBLISHERS")}
+    content=${content//__JANUS_ROOM_BITRATE__/$(escape_sed_replacement "$JANUS_ROOM_BITRATE")}
     content=${content//__JANUS_STUN_BLOCK__/$janus_stun_block}
     content=${content//__JANUS_PUBLIC_IP_BLOCK__/$janus_public_ip_block}
     content=${content//__JANUS_KEEP_PRIVATE_HOST_BLOCK__/$janus_keep_private_host_block}
@@ -114,6 +115,7 @@ JANUS_ROOM_DESCRIPTION=${JANUS_ROOM_DESCRIPTION:-OpenResist Live Room}
 JANUS_ROOM_PUBLISHERS=${JANUS_ROOM_PUBLISHERS:-6}
 JANUS_ROOM_AUDIOCODEC=${JANUS_ROOM_AUDIOCODEC:-opus}
 JANUS_ROOM_VIDEOCODEC=${JANUS_ROOM_VIDEOCODEC:-h264,vp8}
+JANUS_ROOM_BITRATE=${JANUS_ROOM_BITRATE:-350000}
 JANUS_ADMIN_SECRET=${JANUS_ADMIN_SECRET:-change-this-admin-secret}
 JANUS_RTP_PORT_RANGE=${JANUS_RTP_PORT_RANGE:-20000-20100}
 JANUS_STUN_PORT=${JANUS_STUN_PORT:-3478}

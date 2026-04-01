@@ -74,6 +74,10 @@ If you set `WHIP_ENDPOINT_TOKEN`, clients must send it as a Bearer token.
 
 `WHIP_ICE_SERVERS` accepts either a comma-separated URI list like `stun:stun.cloudflare.com:3478,turn:turn.example.com?transport=udp` or a JSON object/array when you need usernames and credentials.
 
+`METERED_TURN_DOMAIN` and `METERED_TURN_API_KEY` are reserved for your Metered TURN deployment. The API key is intentionally kept separate from `WHIP_ICE_SERVERS` so you can rotate it without editing the rest of the ingest config.
+
+`JANUS_ROOM_BITRATE` caps the publish bitrate in the VideoRoom. The current test profile sets it to `350000` bps to keep streams heavily compressed while you validate connectivity.
+
 The built-in watch page subscribes to the first active publisher in the configured Janus VideoRoom and is available at `/watch/` on both the local origin and the public hostname.
 
 ## Cloudflare Tunnel
