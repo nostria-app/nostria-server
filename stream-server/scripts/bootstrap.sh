@@ -39,6 +39,91 @@ escape_sed_replacement() {
     printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'
 }
 
+fetch_metered_turn_settings() {
+    python3 - "$METERED_TURN_DOMAIN" "$METERED_TURN_API_KEY" <<'PY'
+import json
+import re
+import shlex
+import sys
+import urllib.parse
+import urllib.request
+
+domain, api_key = sys.argv[1:3]
+url = f"https://{domain}/api/v1/turn/credentials?apiKey={urllib.parse.quote(api_key, safe='')}"
+
+try:
+    with urllib.request.urlopen(url, timeout=10) as response:
+        payload = json.load(response)
+except Exception as exc:
+    print(f"Metered TURN API request failed: {exc}", file=sys.stderr)
+    raise SystemExit(1)
+
+if not isinstance(payload, list):
+    print("Metered TURN API returned a non-array payload", file=sys.stderr)
+    raise SystemExit(1)
+
+rankings = {
+    ("turn", "udp"): 0,
+    ("turn", "tcp"): 1,
+    ("turns", "tls"): 2,
+    ("turns", "tcp"): 3,
+    ("turn", ""): 4,
+    ("turns", ""): 5,
+}
+
+best = None
+
+for server in payload:
+    if not isinstance(server, dict):
+        continue
+    urls = server.get("urls") or server.get("url") or server.get("uri") or []
+    if isinstance(urls, str):
+        urls = [urls]
+    username = server.get("username")
+    credential = server.get("credential")
+    if not username or not credential:
+        continue
+
+    for candidate in urls:
+        if not isinstance(candidate, str):
+            continue
+        match = re.match(r'^(turns?):([^:?]+)(?::(\d+))?(?:\?transport=([a-z]+))?$', candidate)
+        if not match:
+            continue
+
+        scheme, host, port, transport = match.groups()
+        if scheme == "turns" and not transport:
+            transport = "tls"
+        elif not transport:
+            transport = "udp"
+
+        score = rankings.get((scheme, transport), 99)
+        item = {
+            "score": score,
+            "server": host,
+            "port": port or ("443" if scheme == "turns" else "3478"),
+            "type": transport,
+            "user": username,
+            "pwd": credential,
+        }
+        if best is None or item["score"] < best["score"]:
+            best = item
+
+if best is None:
+    print("Metered TURN API returned no usable TURN credentials", file=sys.stderr)
+    raise SystemExit(1)
+
+for key, value in {
+    "JANUS_TURN_SERVER": best["server"],
+    "JANUS_TURN_PORT": best["port"],
+    "JANUS_TURN_TYPE": best["type"],
+    "JANUS_TURN_USER": best["user"],
+    "JANUS_TURN_PWD": best["pwd"],
+}.items():
+    print(f"{key}={shlex.quote(str(value))}")
+PY
+}
+
 render_template() {
     local template_file=$1
     local target_file=$2
@@ -46,6 +131,7 @@ render_template() {
     local janus_stun_block=''
     local janus_public_ip_block=''
     local janus_keep_private_host_block=''
+    local janus_turn_block=''
     local janus_room_secret_block=''
     local janus_room_pin_block=''
     local janus_room_audiocodec_block=''
@@ -64,6 +150,14 @@ render_template() {
 
     if [[ "${JANUS_KEEP_PRIVATE_HOST:-false}" == "true" ]]; then
         janus_keep_private_host_block=$'        keep_private_host = true\n'
+    fi
+
+    if [[ -n "${JANUS_TURN_SERVER:-}" && -n "${JANUS_TURN_USER:-}" && -n "${JANUS_TURN_PWD:-}" ]]; then
+        janus_turn_block=$'        turn_server = "'"$JANUS_TURN_SERVER"$'"\n'
+        janus_turn_block+=$'        turn_port = '"$JANUS_TURN_PORT"$'\n'
+        janus_turn_block+=$'        turn_type = "'"$JANUS_TURN_TYPE"$'"\n'
+        janus_turn_block+=$'        turn_user = "'"$JANUS_TURN_USER"$'"\n'
+        janus_turn_block+=$'        turn_pwd = "'"$JANUS_TURN_PWD"$'"\n'
     fi
 
     if [[ -n "${JANUS_ROOM_SECRET:-}" ]]; then
@@ -91,6 +185,7 @@ render_template() {
     content=${content//__JANUS_STUN_BLOCK__/$janus_stun_block}
     content=${content//__JANUS_PUBLIC_IP_BLOCK__/$janus_public_ip_block}
     content=${content//__JANUS_KEEP_PRIVATE_HOST_BLOCK__/$janus_keep_private_host_block}
+    content=${content//__JANUS_TURN_BLOCK__/$janus_turn_block}
     content=${content//__JANUS_ROOM_SECRET_BLOCK__/$janus_room_secret_block}
     content=${content//__JANUS_ROOM_PIN_BLOCK__/$janus_room_pin_block}
     content=${content//__JANUS_ROOM_AUDIOCODEC_BLOCK__/$janus_room_audiocodec_block}
@@ -119,6 +214,16 @@ JANUS_ROOM_BITRATE=${JANUS_ROOM_BITRATE:-350000}
 JANUS_ADMIN_SECRET=${JANUS_ADMIN_SECRET:-change-this-admin-secret}
 JANUS_RTP_PORT_RANGE=${JANUS_RTP_PORT_RANGE:-20000-20100}
 JANUS_STUN_PORT=${JANUS_STUN_PORT:-3478}
+JANUS_TURN_PORT=${JANUS_TURN_PORT:-3478}
+JANUS_TURN_TYPE=${JANUS_TURN_TYPE:-udp}
+
+if [[ -n "${METERED_TURN_DOMAIN:-}" && -n "${METERED_TURN_API_KEY:-}" ]]; then
+    if metered_turn_settings=$(fetch_metered_turn_settings 2>&1); then
+        eval "$metered_turn_settings"
+    else
+        echo "WARNING: $metered_turn_settings" >&2
+    fi
+fi
 
 COMPOSE_CMD=$(get_compose_cmd)
 

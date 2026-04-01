@@ -33,6 +33,8 @@ services:
       WHIP_STRICT_ETAGS: "${WHIP_STRICT_ETAGS}"
       WHIP_ICE_SERVERS: "${WHIP_ICE_SERVERS}"
       WHIP_DEBUG_LEVEL: "${WHIP_DEBUG_LEVEL}"
+      METERED_TURN_DOMAIN: "${METERED_TURN_DOMAIN}"
+      METERED_TURN_API_KEY: "${METERED_TURN_API_KEY}"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7080/healthz').then(response => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1))"]
       interval: 30s

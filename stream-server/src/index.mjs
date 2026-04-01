@@ -5,6 +5,25 @@ import { fileURLToPath } from 'url';
 import httpProxy from 'http-proxy';
 import { JanusWhipServer } from 'janus-whip-server';
 
+function normalizeIceServer(entry) {
+  if (typeof entry === 'string') {
+    return { uri: entry, urls: entry };
+  }
+
+  const normalized = { ...entry };
+  const urls = normalized.urls || normalized.url || normalized.uri;
+
+  if (urls && !normalized.urls) {
+    normalized.urls = urls;
+  }
+
+  if (!normalized.uri) {
+    normalized.uri = Array.isArray(urls) ? urls[0] : urls;
+  }
+
+  return normalized;
+}
+
 function parseBoolean(value, defaultValue) {
   if (value === undefined || value === null || value === '') {
     return defaultValue;
@@ -25,15 +44,62 @@ function parseIceServers(value) {
       .split(',')
       .map(uri => uri.trim())
       .filter(Boolean)
-      .map(uri => ({ uri }));
+      .map(uri => normalizeIceServer(uri));
   }
 
   try {
     const parsed = JSON.parse(trimmedValue);
-    return Array.isArray(parsed) ? parsed : [parsed];
+    return (Array.isArray(parsed) ? parsed : [parsed]).map(normalizeIceServer);
   } catch (error) {
     throw new Error(`Invalid WHIP_ICE_SERVERS JSON: ${error.message}`);
   }
+}
+
+function dedupeIceServers(iceServers) {
+  const seen = new Set();
+
+  return iceServers.filter(entry => {
+    const urls = Array.isArray(entry.urls) ? entry.urls.join(',') : entry.urls || entry.uri || '';
+    const key = JSON.stringify({
+      urls,
+      username: entry.username || '',
+      credential: entry.credential || ''
+    });
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+async function fetchMeteredIceServers() {
+  const domain = process.env.METERED_TURN_DOMAIN;
+  const apiKey = process.env.METERED_TURN_API_KEY;
+
+  if (!domain || !apiKey) {
+    return [];
+  }
+
+  const endpoint = new URL(`https://${domain}/api/v1/turn/credentials`);
+  endpoint.searchParams.set('apiKey', apiKey);
+
+  const response = await fetch(endpoint, {
+    signal: AbortSignal.timeout(10000)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Metered TURN API returned ${response.status}`);
+  }
+
+  const payload = await response.json();
+  if (!Array.isArray(payload)) {
+    throw new Error('Metered TURN API returned a non-array response');
+  }
+
+  return payload.map(normalizeIceServer);
 }
 
 function parseRoomId(value) {
@@ -59,7 +125,18 @@ async function main() {
   const janusWsUrl = process.env.JANUS_WS_URL || 'ws://janus:8188';
   const janusHttpUrl = process.env.JANUS_HTTP_URL || 'http://janus:8088/janus';
   const debugLevel = process.env.WHIP_DEBUG_LEVEL || 'info';
-  const iceServers = parseIceServers(process.env.WHIP_ICE_SERVERS || '[]');
+  const staticIceServers = parseIceServers(process.env.WHIP_ICE_SERVERS || '[]');
+  let meteredIceServers = [];
+  let meteredTurnError = null;
+
+  try {
+    meteredIceServers = await fetchMeteredIceServers();
+  } catch (error) {
+    meteredTurnError = error.message;
+    console.error(`Failed to fetch Metered TURN credentials: ${error.message}`);
+  }
+
+  const iceServers = dedupeIceServers([...staticIceServers, ...meteredIceServers]);
   const janusProxy = httpProxy.createProxyServer({
     target: janusHttpUrl,
     changeOrigin: true,
@@ -94,7 +171,9 @@ async function main() {
       endpointLabel,
       janusPath,
       janusProtocol: protocol,
-      janusHttpUrl: janusPath
+      janusHttpUrl: janusPath,
+      iceServers,
+      meteredTurnEnabled: meteredIceServers.length > 0
     });
   });
 
@@ -111,6 +190,9 @@ async function main() {
       basePath,
       endpointId,
       roomId,
+      iceServersCount: iceServers.length,
+      meteredTurnEnabled: meteredIceServers.length > 0,
+      meteredTurnError,
       endpoints: whipServer ? whipServer.listEndpoints() : []
     });
   });
@@ -149,6 +231,8 @@ async function main() {
   });
 
   await whipServer.start();
+
+  console.log(`Resolved ${iceServers.length} ICE server entries for WHIP and watch clients`);
 
   const endpoint = whipServer.createEndpoint({
     id: endpointId,

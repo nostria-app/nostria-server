@@ -140,6 +140,22 @@
         font-size: 16px;
       }
 
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 18px;
+      }
+
+      .meta-grid > div {
+        min-width: 0;
+      }
+
+      .meta dd.mono {
+        font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+        font-size: 13px;
+        word-break: break-word;
+      }
+
       .log {
         padding: 18px;
         font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
@@ -175,7 +191,7 @@
         </section>
 
         <aside class="panel meta">
-          <dl>
+          <dl class="meta-grid">
             <div>
               <dt>Room</dt>
               <dd id="room-id">-</dd>
@@ -186,7 +202,43 @@
             </div>
             <div>
               <dt>Signal Path</dt>
-              <dd id="janus-path">-</dd>
+              <dd id="janus-path" class="mono">-</dd>
+            </div>
+            <div>
+              <dt>Publisher Feed</dt>
+              <dd id="feed-id">-</dd>
+            </div>
+            <div>
+              <dt>Video Codec</dt>
+              <dd id="video-codec">-</dd>
+            </div>
+            <div>
+              <dt>Audio Codec</dt>
+              <dd id="audio-codec">-</dd>
+            </div>
+            <div>
+              <dt>Resolution</dt>
+              <dd id="resolution">-</dd>
+            </div>
+            <div>
+              <dt>Bandwidth</dt>
+              <dd id="bandwidth">-</dd>
+            </div>
+            <div>
+              <dt>Frame Rate</dt>
+              <dd id="frame-rate">-</dd>
+            </div>
+            <div>
+              <dt>Packet Loss</dt>
+              <dd id="packet-loss">-</dd>
+            </div>
+            <div>
+              <dt>Round Trip</dt>
+              <dd id="round-trip">-</dd>
+            </div>
+            <div>
+              <dt>ICE Path</dt>
+              <dd id="ice-path" class="mono">-</dd>
             </div>
           </dl>
         </aside>
@@ -204,12 +256,184 @@
       const roomElement = document.getElementById('room-id');
       const endpointElement = document.getElementById('endpoint-id');
       const janusPathElement = document.getElementById('janus-path');
+      const feedElement = document.getElementById('feed-id');
+      const videoCodecElement = document.getElementById('video-codec');
+      const audioCodecElement = document.getElementById('audio-codec');
+      const resolutionElement = document.getElementById('resolution');
+      const bandwidthElement = document.getElementById('bandwidth');
+      const frameRateElement = document.getElementById('frame-rate');
+      const packetLossElement = document.getElementById('packet-loss');
+      const roundTripElement = document.getElementById('round-trip');
+      const icePathElement = document.getElementById('ice-path');
 
       let janus = null;
       let controlHandle = null;
       let subscriberHandle = null;
       let remoteStream = new MediaStream();
       let subscribedFeedId = null;
+      let statsIntervalId = null;
+      let statsSnapshot = new Map();
+
+      function setMetric(element, value) {
+        element.textContent = value || '-';
+      }
+
+      function resetMetrics() {
+        setMetric(feedElement, subscribedFeedId ? String(subscribedFeedId) : '-');
+        setMetric(videoCodecElement, '-');
+        setMetric(audioCodecElement, '-');
+        setMetric(resolutionElement, videoElement.videoWidth && videoElement.videoHeight ? `${videoElement.videoWidth} x ${videoElement.videoHeight}` : '-');
+        setMetric(bandwidthElement, '-');
+        setMetric(frameRateElement, '-');
+        setMetric(packetLossElement, '-');
+        setMetric(roundTripElement, '-');
+        setMetric(icePathElement, '-');
+      }
+
+      function formatBitrate(bitsPerSecond) {
+        if (!Number.isFinite(bitsPerSecond) || bitsPerSecond <= 0) {
+          return '-';
+        }
+
+        if (bitsPerSecond >= 1000000) {
+          return `${(bitsPerSecond / 1000000).toFixed(2)} Mbps`;
+        }
+
+        return `${Math.round(bitsPerSecond / 1000)} kbps`;
+      }
+
+      function formatCodec(stats, codecReport) {
+        if (!codecReport || !codecReport.mimeType) {
+          return '-';
+        }
+
+        const mime = codecReport.mimeType.split('/').pop() || codecReport.mimeType;
+        const profile = codecReport.sdpFmtpLine ? ` (${codecReport.sdpFmtpLine})` : '';
+        return `${mime}${profile}`;
+      }
+
+      function formatCandidateType(candidate) {
+        if (!candidate) {
+          return 'unknown';
+        }
+
+        return [candidate.candidateType, candidate.protocol].filter(Boolean).join('/') || 'unknown';
+      }
+
+      function stopStatsPolling() {
+        if (statsIntervalId) {
+          clearInterval(statsIntervalId);
+          statsIntervalId = null;
+        }
+        statsSnapshot = new Map();
+      }
+
+      async function updateSubscriberStats() {
+        const peerConnection = subscriberHandle?.webrtcStuff?.pc;
+        if (!peerConnection) {
+          return;
+        }
+
+        const reports = await peerConnection.getStats();
+        let selectedPair = null;
+        let remoteCandidate = null;
+        let localCandidate = null;
+        let videoInbound = null;
+        let audioInbound = null;
+        let videoCodec = null;
+        let audioCodec = null;
+
+        reports.forEach(report => {
+          if (report.type === 'transport' && report.selectedCandidatePairId) {
+            selectedPair = reports.get(report.selectedCandidatePairId) || selectedPair;
+          }
+
+          if (report.type === 'candidate-pair' && report.state === 'succeeded' && (report.selected || report.nominated)) {
+            selectedPair = report;
+          }
+
+          if (report.type === 'inbound-rtp' && !report.isRemote) {
+            if (report.kind === 'video') {
+              videoInbound = report;
+            }
+            if (report.kind === 'audio') {
+              audioInbound = report;
+            }
+          }
+        });
+
+        if (selectedPair) {
+          localCandidate = reports.get(selectedPair.localCandidateId);
+          remoteCandidate = reports.get(selectedPair.remoteCandidateId);
+          const currentRoundTrip = selectedPair.currentRoundTripTime;
+          setMetric(roundTripElement, Number.isFinite(currentRoundTrip) ? `${Math.round(currentRoundTrip * 1000)} ms` : '-');
+          setMetric(icePathElement, `${formatCandidateType(localCandidate)} -> ${formatCandidateType(remoteCandidate)}`);
+        }
+
+        if (videoInbound) {
+          videoCodec = reports.get(videoInbound.codecId);
+          setMetric(videoCodecElement, formatCodec(videoInbound, videoCodec));
+          const previousVideo = statsSnapshot.get(videoInbound.id);
+          const width = videoInbound.frameWidth || videoElement.videoWidth;
+          const height = videoInbound.frameHeight || videoElement.videoHeight;
+          setMetric(resolutionElement, width && height ? `${width} x ${height}` : '-');
+
+          if (previousVideo && Number.isFinite(videoInbound.timestamp) && videoInbound.timestamp > previousVideo.timestamp) {
+            const seconds = (videoInbound.timestamp - previousVideo.timestamp) / 1000;
+            const bitrate = ((videoInbound.bytesReceived - previousVideo.bytesReceived) * 8) / seconds;
+            const fps = Number.isFinite(videoInbound.framesPerSecond)
+              ? videoInbound.framesPerSecond
+              : Number.isFinite(videoInbound.framesDecoded) && Number.isFinite(previousVideo.framesDecoded)
+                ? (videoInbound.framesDecoded - previousVideo.framesDecoded) / seconds
+                : null;
+            const lost = Number.isFinite(videoInbound.packetsLost) ? videoInbound.packetsLost : null;
+
+            setMetric(frameRateElement, Number.isFinite(fps) ? `${fps.toFixed(1)} fps` : '-');
+            setMetric(packetLossElement, Number.isFinite(lost) ? `${lost} packets` : '-');
+
+            const previousAudio = audioInbound ? statsSnapshot.get(audioInbound.id) : null;
+            let totalBitrate = bitrate;
+            let audioBitrate = null;
+
+            if (audioInbound && previousAudio && audioInbound.timestamp > previousAudio.timestamp) {
+              audioBitrate = ((audioInbound.bytesReceived - previousAudio.bytesReceived) * 8) / ((audioInbound.timestamp - previousAudio.timestamp) / 1000);
+              totalBitrate += audioBitrate;
+            }
+
+            const segments = [`total ${formatBitrate(totalBitrate)}`, `video ${formatBitrate(bitrate)}`];
+            if (Number.isFinite(audioBitrate) && audioBitrate > 0) {
+              segments.push(`audio ${formatBitrate(audioBitrate)}`);
+            }
+            setMetric(bandwidthElement, segments.join(' / '));
+          }
+
+          statsSnapshot.set(videoInbound.id, {
+            timestamp: videoInbound.timestamp,
+            bytesReceived: videoInbound.bytesReceived,
+            framesDecoded: videoInbound.framesDecoded
+          });
+        }
+
+        if (audioInbound) {
+          audioCodec = reports.get(audioInbound.codecId);
+          setMetric(audioCodecElement, formatCodec(audioInbound, audioCodec));
+          statsSnapshot.set(audioInbound.id, {
+            timestamp: audioInbound.timestamp,
+            bytesReceived: audioInbound.bytesReceived,
+            framesDecoded: audioInbound.framesDecoded
+          });
+        }
+      }
+
+      function startStatsPolling() {
+        stopStatsPolling();
+        resetMetrics();
+        statsIntervalId = window.setInterval(() => {
+          updateSubscriberStats().catch(error => {
+            log(`Stats update failed: ${error.message || error}`);
+          });
+        }, 2000);
+      }
 
       function log(message) {
         const timestamp = new Date().toLocaleTimeString();
@@ -236,6 +460,7 @@
         }
 
         subscribedFeedId = feedId;
+        setMetric(feedElement, String(feedId));
         setStatus('waiting', 'Negotiating playback', `Subscribing to publisher ${feedId}`);
         log(`Attaching subscriber for feed ${feedId}`);
 
@@ -277,6 +502,7 @@
 
             if (msg.videoroom === 'event' && msg.started === 'ok') {
               setStatus('live', 'Live stream connected', `Receiving publisher ${feedId}`);
+              startStatsPolling();
             }
           },
           onremotetrack(track, mid, added) {
@@ -291,12 +517,17 @@
             remoteStream.addTrack(track);
             videoElement.srcObject = remoteStream;
             log(`Remote ${track.kind} track added on mid ${mid}`);
+            if (track.kind === 'video') {
+              setMetric(resolutionElement, videoElement.videoWidth && videoElement.videoHeight ? `${videoElement.videoWidth} x ${videoElement.videoHeight}` : '-');
+            }
           },
           oncleanup() {
+            stopStatsPolling();
             remoteStream = new MediaStream();
             videoElement.srcObject = remoteStream;
             subscriberHandle = null;
             subscribedFeedId = null;
+            resetMetrics();
             setStatus('waiting', 'Subscription ended', 'Waiting for the next active publisher');
             log('Subscriber cleanup complete');
           }
@@ -320,6 +551,7 @@
 
       async function start() {
         const config = await fetchConfig();
+        resetMetrics();
         roomElement.textContent = String(config.roomId);
         endpointElement.textContent = config.endpointId;
         janusPathElement.textContent = config.janusPath;
@@ -333,6 +565,7 @@
           callback() {
             janus = new Janus({
               server,
+              iceServers: config.iceServers,
               success() {
                 janus.attach({
                   plugin: 'janus.plugin.videoroom',
@@ -363,6 +596,8 @@
                     }
 
                     if (msg.videoroom === 'event' && msg.unpublished && String(msg.unpublished) === String(subscribedFeedId)) {
+                      stopStatsPolling();
+                      resetMetrics();
                       setStatus('waiting', 'Publisher went offline', 'Waiting for the next active publisher');
                     }
                   }
