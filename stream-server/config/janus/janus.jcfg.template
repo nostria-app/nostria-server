@@ -14,5 +14,7 @@ media: {
 
 nat: {
         nice_debug = false
-__JANUS_STUN_BLOCK____JANUS_PUBLIC_IP_BLOCK__
+__JANUS_STUN_BLOCK__
+__JANUS_PUBLIC_IP_BLOCK__
+__JANUS_KEEP_PRIVATE_HOST_BLOCK__
 }

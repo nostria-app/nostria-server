@@ -10,6 +10,9 @@ COPY package.json ./
 RUN npm install --omit=dev
 
 COPY public ./public
+RUN mkdir -p ./public/vendor \
+	&& cp ./node_modules/janus-gateway/npm/src/janus.js ./public/vendor/janus.js \
+	&& cp ./node_modules/webrtc-adapter/out/adapter.js ./public/vendor/adapter.js
 COPY src ./src
 
 EXPOSE 7080

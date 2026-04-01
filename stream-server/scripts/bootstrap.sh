@@ -45,18 +45,25 @@ render_template() {
     local content
     local janus_stun_block=''
     local janus_public_ip_block=''
+    local janus_keep_private_host_block=''
     local janus_room_secret_block=''
     local janus_room_pin_block=''
+    local janus_room_audiocodec_block=''
+    local janus_room_videocodec_block=''
 
     content=$(<"$template_file")
 
     if [[ -n "${JANUS_STUN_SERVER:-}" ]]; then
         janus_stun_block=$'        stun_server = "'"$JANUS_STUN_SERVER"$'"\n'
-        janus_stun_block+=$'        stun_port = '"$JANUS_STUN_PORT"
+        janus_stun_block+=$'        stun_port = '"$JANUS_STUN_PORT"$'\n'
     fi
 
     if [[ -n "${JANUS_PUBLIC_IP:-}" ]]; then
-        janus_public_ip_block=$'        nat_1_1_mapping = "'"$JANUS_PUBLIC_IP"$'"'
+        janus_public_ip_block=$'        nat_1_1_mapping = "'"$JANUS_PUBLIC_IP"$'"\n'
+    fi
+
+    if [[ "${JANUS_KEEP_PRIVATE_HOST:-false}" == "true" ]]; then
+        janus_keep_private_host_block=$'        keep_private_host = true\n'
     fi
 
     if [[ -n "${JANUS_ROOM_SECRET:-}" ]]; then
@@ -67,6 +74,14 @@ render_template() {
         janus_room_pin_block=$'        pin = "'"$JANUS_ROOM_PIN"$'"\n'
     fi
 
+    if [[ -n "${JANUS_ROOM_AUDIOCODEC:-}" ]]; then
+        janus_room_audiocodec_block=$'        audiocodec = "'"$JANUS_ROOM_AUDIOCODEC"$'"\n'
+    fi
+
+    if [[ -n "${JANUS_ROOM_VIDEOCODEC:-}" ]]; then
+        janus_room_videocodec_block=$'        videocodec = "'"$JANUS_ROOM_VIDEOCODEC"$'"\n'
+    fi
+
     content=${content//__JANUS_ADMIN_SECRET__/$(escape_sed_replacement "$JANUS_ADMIN_SECRET")}
     content=${content//__JANUS_RTP_PORT_RANGE__/$(escape_sed_replacement "$JANUS_RTP_PORT_RANGE")}
     content=${content//__JANUS_ROOM_ID__/$(escape_sed_replacement "$WHIP_ROOM_ID")}
@@ -74,8 +89,11 @@ render_template() {
     content=${content//__JANUS_ROOM_PUBLISHERS__/$(escape_sed_replacement "$JANUS_ROOM_PUBLISHERS")}
     content=${content//__JANUS_STUN_BLOCK__/$janus_stun_block}
     content=${content//__JANUS_PUBLIC_IP_BLOCK__/$janus_public_ip_block}
+    content=${content//__JANUS_KEEP_PRIVATE_HOST_BLOCK__/$janus_keep_private_host_block}
     content=${content//__JANUS_ROOM_SECRET_BLOCK__/$janus_room_secret_block}
     content=${content//__JANUS_ROOM_PIN_BLOCK__/$janus_room_pin_block}
+    content=${content//__JANUS_ROOM_AUDIOCODEC_BLOCK__/$janus_room_audiocodec_block}
+    content=${content//__JANUS_ROOM_VIDEOCODEC_BLOCK__/$janus_room_videocodec_block}
 
     printf '%s\n' "$content" > "$target_file"
 }
@@ -94,6 +112,8 @@ WHIP_ROOM_ID=${WHIP_ROOM_ID:-1234}
 WHIP_ENDPOINT_LABEL=${WHIP_ENDPOINT_LABEL:-OpenResist Live}
 JANUS_ROOM_DESCRIPTION=${JANUS_ROOM_DESCRIPTION:-OpenResist Live Room}
 JANUS_ROOM_PUBLISHERS=${JANUS_ROOM_PUBLISHERS:-6}
+JANUS_ROOM_AUDIOCODEC=${JANUS_ROOM_AUDIOCODEC:-opus}
+JANUS_ROOM_VIDEOCODEC=${JANUS_ROOM_VIDEOCODEC:-h264,vp8}
 JANUS_ADMIN_SECRET=${JANUS_ADMIN_SECRET:-change-this-admin-secret}
 JANUS_RTP_PORT_RANGE=${JANUS_RTP_PORT_RANGE:-20000-20100}
 JANUS_STUN_PORT=${JANUS_STUN_PORT:-3478}

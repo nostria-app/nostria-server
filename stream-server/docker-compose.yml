@@ -6,7 +6,7 @@ services:
     container_name: openresist-stream-janus
     restart: unless-stopped
     ports:
-      - "20000-20100/udp"
+      - "20000-20100:20000-20100/udp"
     volumes:
       - /mnt/data/openresist/stream-server/janus/janus.jcfg:/usr/local/etc/janus/janus.jcfg:ro
       - /mnt/data/openresist/stream-server/janus/janus.transport.websockets.jcfg:/usr/local/etc/janus/janus.transport.websockets.jcfg:ro
