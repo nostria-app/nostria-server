@@ -76,7 +76,7 @@ If you set `WHIP_ENDPOINT_TOKEN`, clients must send it as a Bearer token.
 
 `METERED_TURN_DOMAIN` and `METERED_TURN_API_KEY` activate automatic Metered TURN credential fetching. The stream-server runtime uses the returned `iceServers` list for WHIP publishers and for the watch page, while `bootstrap.sh` also derives a Janus relay configuration from the same Metered response so Janus can advertise TURN relay candidates for public viewers.
 
-`JANUS_ROOM_BITRATE` caps the publish bitrate in the VideoRoom. The current test profile sets it to `350000` bps to keep streams heavily compressed while you validate connectivity.
+`JANUS_ROOM_BITRATE` caps the publish video bitrate in the VideoRoom. `JANUS_ROOM_BITRATE_CAP=true` makes that cap a hard limit rather than a soft target. The current test profile sets it to `500000` bps to keep streams heavily compressed while you validate connectivity from public networks.
 
 The built-in watch page subscribes to the first active publisher in the configured Janus VideoRoom and is available at `/watch/` on both the local origin and the public hostname.
 
