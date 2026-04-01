@@ -111,6 +111,12 @@ function parseRoomId(value) {
   return roomId;
 }
 
+function getBearerToken(req) {
+  const header = req.headers.authorization || '';
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1] : null;
+}
+
 async function main() {
   const app = express();
   const __filename = fileURLToPath(import.meta.url);
@@ -120,7 +126,10 @@ async function main() {
   const basePath = process.env.WHIP_BASE_PATH || '/whip';
   const endpointId = process.env.WHIP_ENDPOINT_ID || 'live';
   const endpointLabel = process.env.WHIP_ENDPOINT_LABEL || 'OpenResist Live';
+  const browserEndpointId = process.env.WHIP_BROWSER_ENDPOINT_ID || 'browser';
+  const browserEndpointLabel = process.env.WHIP_BROWSER_ENDPOINT_LABEL || 'OpenResist Browser';
   const endpointToken = process.env.WHIP_ENDPOINT_TOKEN || undefined;
+  const adminToken = process.env.STREAM_ADMIN_TOKEN || process.env.JANUS_ADMIN_SECRET || undefined;
   const roomId = parseRoomId(process.env.WHIP_ROOM_ID || '1234');
   const janusWsUrl = process.env.JANUS_WS_URL || 'ws://janus:8188';
   const janusHttpUrl = process.env.JANUS_HTTP_URL || 'http://janus:8088/janus';
@@ -144,6 +153,55 @@ async function main() {
   });
 
   let whipServer;
+  const endpointDefinitions = [
+    { id: endpointId, label: endpointLabel },
+    { id: browserEndpointId, label: browserEndpointLabel }
+  ].filter((entry, index, list) => list.findIndex(candidate => candidate.id === entry.id) === index);
+
+  function bindEndpointEvents(endpoint) {
+    endpoint.on('endpoint-active', function onEndpointActive() {
+      console.log(`[${this.id}] publisher connected`);
+    });
+
+    endpoint.on('endpoint-inactive', function onEndpointInactive() {
+      console.log(`[${this.id}] publisher disconnected`);
+    });
+
+    return endpoint;
+  }
+
+  function createManagedEndpoint(definition) {
+    return bindEndpointEvents(whipServer.createEndpoint({
+      id: definition.id,
+      room: roomId,
+      label: definition.label,
+      token: endpointToken
+    }));
+  }
+
+  async function resetManagedEndpoint(id) {
+    const definition = endpointDefinitions.find(entry => entry.id === id);
+    if (!definition) {
+      return null;
+    }
+
+    await whipServer.destroyEndpoint({ id });
+    return createManagedEndpoint(definition);
+  }
+
+  function requireAdmin(req, res, next) {
+    if (!adminToken) {
+      res.status(503).json({ error: 'Admin routes disabled: no admin token configured' });
+      return;
+    }
+
+    if (getBearerToken(req) !== adminToken) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    next();
+  }
 
   janusProxy.on('error', (error, req, res) => {
     console.error('Janus proxy error:', error.message);
@@ -169,6 +227,7 @@ async function main() {
       roomId,
       endpointId,
       endpointLabel,
+      browserEndpointId,
       janusPath,
       janusProtocol: protocol,
       janusHttpUrl: janusPath,
@@ -189,6 +248,7 @@ async function main() {
       janusWsUrl,
       basePath,
       endpointId,
+      browserEndpointId,
       roomId,
       iceServersCount: iceServers.length,
       meteredTurnEnabled: meteredIceServers.length > 0,
@@ -199,6 +259,32 @@ async function main() {
 
   app.get('/endpoints', (_req, res) => {
     res.json(whipServer ? whipServer.listEndpoints() : []);
+  });
+
+  app.get('/admin/endpoints', requireAdmin, (_req, res) => {
+    res.json({
+      basePath,
+      endpoints: whipServer ? whipServer.listEndpoints() : []
+    });
+  });
+
+  app.post('/admin/endpoints/:id/reset', requireAdmin, async (req, res) => {
+    try {
+      const endpoint = await resetManagedEndpoint(req.params.id);
+      if (!endpoint) {
+        res.status(404).json({ error: 'Unknown endpoint id' });
+        return;
+      }
+
+      res.json({
+        status: 'reset',
+        id: req.params.id,
+        endpoints: whipServer.listEndpoints()
+      });
+    } catch (error) {
+      console.error(`Failed to reset endpoint ${req.params.id}:`, error);
+      res.status(500).json({ error: 'Endpoint reset failed' });
+    }
   });
 
   const httpServer = http.createServer({}, app);
@@ -234,20 +320,7 @@ async function main() {
 
   console.log(`Resolved ${iceServers.length} ICE server entries for WHIP and watch clients`);
 
-  const endpoint = whipServer.createEndpoint({
-    id: endpointId,
-    room: roomId,
-    label: endpointLabel,
-    token: endpointToken
-  });
-
-  endpoint.on('endpoint-active', function onEndpointActive() {
-    console.log(`[${this.id}] publisher connected`);
-  });
-
-  endpoint.on('endpoint-inactive', function onEndpointInactive() {
-    console.log(`[${this.id}] publisher disconnected`);
-  });
+  endpointDefinitions.forEach(createManagedEndpoint);
 
   await new Promise((resolve, reject) => {
     httpServer.once('error', reject);
@@ -255,6 +328,7 @@ async function main() {
   });
 
   console.log(`WHIP server listening on http://0.0.0.0:${httpPort}${basePath}/endpoint/${endpointId}`);
+  console.log(`Browser WHIP endpoint listening on http://0.0.0.0:${httpPort}${basePath}/endpoint/${browserEndpointId}`);
 
   const shutdown = async signal => {
     console.log(`Received ${signal}, shutting down`);

@@ -17,6 +17,10 @@ By default that becomes:
 
 - `http://127.0.0.1:7080/whip/endpoint/live`
 
+There is also a second fixed browser-friendly ingest endpoint to avoid collisions with the primary live endpoint:
+
+- `http://127.0.0.1:7080/whip/endpoint/browser`
+
 ## Important Network Constraint
 
 Cloudflare Tunnel can safely expose the WHIP HTTP signaling endpoint, but it does not carry the underlying WebRTC RTP/RTCP media traffic for Janus.
@@ -67,10 +71,15 @@ After bootstrap, the local HTTP endpoints are:
 
 - `GET http://127.0.0.1:7080/healthz`
 - `GET http://127.0.0.1:7080/endpoints`
+- `GET http://127.0.0.1:7080/admin/endpoints` with `Authorization: Bearer <STREAM_ADMIN_TOKEN>`
+- `POST http://127.0.0.1:7080/admin/endpoints/<id>/reset` with `Authorization: Bearer <STREAM_ADMIN_TOKEN>`
 - `GET http://127.0.0.1:7080/watch/`
 - `POST http://127.0.0.1:7080/whip/endpoint/live` by default
+- `POST http://127.0.0.1:7080/whip/endpoint/browser` for browser-specific publishers
 
 If you set `WHIP_ENDPOINT_TOKEN`, clients must send it as a Bearer token.
+
+`STREAM_ADMIN_TOKEN` protects the admin routes for listing and resetting endpoints without restarting the container. Keeping it distinct from `WHIP_ENDPOINT_TOKEN` is recommended.
 
 `WHIP_ICE_SERVERS` accepts either a comma-separated URI list like `stun:stun.cloudflare.com:3478,turn:turn.example.com?transport=udp` or a JSON object/array when you need usernames and credentials.
 
