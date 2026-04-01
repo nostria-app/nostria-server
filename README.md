@@ -86,7 +86,7 @@ See `media-server/README.md` for the full setup and operations guide.
 
 The local WHIP ingest deployment lives in `stream-server/`.
 
-It runs `simple-whip-server` on top of a local Janus backend, listens for WHIP HTTP signaling on `127.0.0.1:7080`, and stores generated Janus runtime config under `/mnt/data/openresist/stream-server`.
+It runs `simple-whip-server` on top of a local Janus backend, exposes a lightweight watch page at `/watch/`, listens for WHIP HTTP signaling on `127.0.0.1:7080`, and stores generated Janus runtime config under `/mnt/data/openresist/stream-server`.
 
 The intended public hostname for this service is `stream.openresist.com`.
 

@@ -9,6 +9,7 @@ RUN apt-get update \
 COPY package.json ./
 RUN npm install --omit=dev
 
+COPY public ./public
 COPY src ./src
 
 EXPOSE 7080

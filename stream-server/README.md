@@ -67,11 +67,14 @@ After bootstrap, the local HTTP endpoints are:
 
 - `GET http://127.0.0.1:7080/healthz`
 - `GET http://127.0.0.1:7080/endpoints`
+- `GET http://127.0.0.1:7080/watch/`
 - `POST http://127.0.0.1:7080/whip/endpoint/live` by default
 
 If you set `WHIP_ENDPOINT_TOKEN`, clients must send it as a Bearer token.
 
 `WHIP_ICE_SERVERS` accepts either a comma-separated URI list like `stun:stun.cloudflare.com:3478,turn:turn.example.com?transport=udp` or a JSON object/array when you need usernames and credentials.
+
+The built-in watch page subscribes to the first active publisher in the configured Janus VideoRoom and is available at `/watch/` on both the local origin and the public hostname.
 
 ## Cloudflare Tunnel
 

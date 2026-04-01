@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OpenResist Stream Watch</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #09111a;
+        --panel: rgba(15, 23, 34, 0.86);
+        --text: #f2f6fa;
+        --muted: #9ab0c5;
+        --line: rgba(154, 176, 197, 0.22);
+        --accent: #7dd3fc;
+        --accent-strong: #22c55e;
+        --danger: #fb7185;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top, rgba(125, 211, 252, 0.18), transparent 30%),
+          linear-gradient(180deg, #0b1420 0%, #060a10 100%);
+        color: var(--text);
+      }
+
+      main {
+        width: min(980px, calc(100vw - 32px));
+        margin: 32px auto;
+        display: grid;
+        gap: 18px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 28px 80px rgba(0, 0, 0, 0.32);
+      }
+
+      .hero {
+        padding: 24px;
+      }
+
+      .eyebrow {
+        display: inline-block;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        background: rgba(125, 211, 252, 0.12);
+        color: var(--accent);
+      }
+
+      h1 {
+        margin: 14px 0 8px;
+        font-size: clamp(28px, 5vw, 44px);
+        line-height: 1.02;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 18px;
+      }
+
+      .video-panel {
+        padding: 18px;
+      }
+
+      video {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border-radius: 16px;
+        background: #000;
+      }
+
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 14px 0 8px;
+        font-weight: 600;
+      }
+
+      .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: var(--danger);
+        box-shadow: 0 0 0 0 rgba(251, 113, 133, 0.48);
+      }
+
+      .dot.live {
+        background: var(--accent-strong);
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.48); }
+        70% { box-shadow: 0 0 0 12px rgba(34, 197, 94, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+      }
+
+      .meta {
+        padding: 18px;
+      }
+
+      .meta dl {
+        margin: 0;
+        display: grid;
+        gap: 14px;
+      }
+
+      .meta dt {
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+
+      .meta dd {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      .log {
+        padding: 18px;
+        font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #cfe2f3;
+        white-space: pre-wrap;
+        min-height: 160px;
+      }
+
+      @media (max-width: 840px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/webrtc-adapter/9.0.1/adapter.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/janus-gateway@1.3.3/html/janus.js"></script>
+  </head>
+  <body>
+    <main>
+      <section class="panel hero">
+        <span class="eyebrow">OpenResist Stream</span>
+        <h1>Live Watch Page</h1>
+        <p>Subscribes directly to the Janus VideoRoom used by the WHIP ingest service. Leave this page open before or during a publish session.</p>
+      </section>
+
+      <section class="grid">
+        <section class="panel video-panel">
+          <video id="video" autoplay playsinline controls></video>
+          <div class="status"><span id="status-dot" class="dot"></span><span id="status-text">Waiting for a live publisher</span></div>
+          <p id="detail-text">The player will subscribe automatically when a publisher appears in the room.</p>
+        </section>
+
+        <aside class="panel meta">
+          <dl>
+            <div>
+              <dt>Room</dt>
+              <dd id="room-id">-</dd>
+            </div>
+            <div>
+              <dt>Endpoint</dt>
+              <dd id="endpoint-id">-</dd>
+            </div>
+            <div>
+              <dt>Signal Path</dt>
+              <dd id="janus-path">-</dd>
+            </div>
+          </dl>
+        </aside>
+      </section>
+
+      <section class="panel log" id="log"></section>
+    </main>
+
+    <script>
+      const videoElement = document.getElementById('video');
+      const statusDot = document.getElementById('status-dot');
+      const statusText = document.getElementById('status-text');
+      const detailText = document.getElementById('detail-text');
+      const logElement = document.getElementById('log');
+      const roomElement = document.getElementById('room-id');
+      const endpointElement = document.getElementById('endpoint-id');
+      const janusPathElement = document.getElementById('janus-path');
+
+      let janus = null;
+      let controlHandle = null;
+      let subscriberHandle = null;
+      let remoteStream = new MediaStream();
+      let subscribedFeedId = null;
+
+      function log(message) {
+        const timestamp = new Date().toLocaleTimeString();
+        logElement.textContent = `[${timestamp}] ${message}\n` + logElement.textContent;
+      }
+
+      function setStatus(mode, headline, detail) {
+        statusDot.classList.toggle('live', mode === 'live');
+        statusText.textContent = headline;
+        detailText.textContent = detail;
+      }
+
+      async function fetchConfig() {
+        const response = await fetch('/watch/config.json');
+        if (!response.ok) {
+          throw new Error('Failed to load watch config');
+        }
+        return response.json();
+      }
+
+      function attachSubscriber(roomId, feedId) {
+        if (subscriberHandle || subscribedFeedId === feedId) {
+          return;
+        }
+
+        subscribedFeedId = feedId;
+        setStatus('waiting', 'Negotiating playback', `Subscribing to publisher ${feedId}`);
+        log(`Attaching subscriber for feed ${feedId}`);
+
+        janus.attach({
+          plugin: 'janus.plugin.videoroom',
+          success(pluginHandle) {
+            subscriberHandle = pluginHandle;
+            subscriberHandle.send({
+              message: {
+                request: 'join',
+                ptype: 'subscriber',
+                room: roomId,
+                streams: [{ feed: feedId }]
+              }
+            });
+          },
+          error(error) {
+            setStatus('error', 'Subscriber attach failed', error);
+            log(`Subscriber attach failed: ${error}`);
+          },
+          onmessage(msg, jsep) {
+            log(`Subscriber event: ${JSON.stringify(msg)}`);
+            if (jsep) {
+              subscriberHandle.createAnswer({
+                jsep,
+                tracks: [{ type: 'data' }],
+                success(answerJsep) {
+                  subscriberHandle.send({
+                    message: { request: 'start', room: roomId },
+                    jsep: answerJsep
+                  });
+                },
+                error(error) {
+                  setStatus('error', 'WebRTC answer failed', error.message || String(error));
+                  log(`WebRTC answer failed: ${error.message || error}`);
+                }
+              });
+            }
+
+            if (msg.videoroom === 'event' && msg.started === 'ok') {
+              setStatus('live', 'Live stream connected', `Receiving publisher ${feedId}`);
+            }
+          },
+          onremotetrack(track, mid, added) {
+            if (!added) {
+              const matchingTrack = remoteStream.getTracks().find(existing => existing.id === track.id);
+              if (matchingTrack) {
+                remoteStream.removeTrack(matchingTrack);
+              }
+              return;
+            }
+
+            remoteStream.addTrack(track);
+            videoElement.srcObject = remoteStream;
+            log(`Remote ${track.kind} track added on mid ${mid}`);
+          },
+          oncleanup() {
+            remoteStream = new MediaStream();
+            videoElement.srcObject = remoteStream;
+            subscriberHandle = null;
+            subscribedFeedId = null;
+            setStatus('waiting', 'Subscription ended', 'Waiting for the next active publisher');
+            log('Subscriber cleanup complete');
+          }
+        });
+      }
+
+      function handlePublisherList(roomId, publishers) {
+        if (!Array.isArray(publishers) || publishers.length === 0) {
+          setStatus('waiting', 'Waiting for a live publisher', 'No active publishers are in the room right now.');
+          return;
+        }
+
+        const feed = publishers[0];
+        if (!feed || !feed.id) {
+          setStatus('waiting', 'Waiting for publisher metadata', 'A publisher event arrived without a usable feed id.');
+          return;
+        }
+
+        attachSubscriber(roomId, feed.id);
+      }
+
+      async function start() {
+        const config = await fetchConfig();
+        roomElement.textContent = String(config.roomId);
+        endpointElement.textContent = config.endpointId;
+        janusPathElement.textContent = config.janusPath;
+
+        const server = `${window.location.origin}${config.janusHttpUrl}`;
+        log(`Connecting to Janus via ${server}`);
+
+        Janus.init({
+          debug: 'all',
+          dependencies: Janus.useDefaultDependencies(),
+          callback() {
+            janus = new Janus({
+              server,
+              success() {
+                janus.attach({
+                  plugin: 'janus.plugin.videoroom',
+                  success(pluginHandle) {
+                    controlHandle = pluginHandle;
+                    controlHandle.send({
+                      message: {
+                        request: 'join',
+                        ptype: 'publisher',
+                        room: config.roomId,
+                        display: 'watch-page'
+                      }
+                    });
+                    setStatus('waiting', 'Watching room presence', 'Joined the room as a passive attendee.');
+                  },
+                  error(error) {
+                    setStatus('error', 'Room join failed', error);
+                    log(`Control handle attach failed: ${error}`);
+                  },
+                  onmessage(msg) {
+                    log(`Control event: ${JSON.stringify(msg)}`);
+                    if (msg.videoroom === 'joined') {
+                      handlePublisherList(config.roomId, msg.publishers || []);
+                    }
+
+                    if (msg.videoroom === 'event' && msg.publishers) {
+                      handlePublisherList(config.roomId, msg.publishers);
+                    }
+
+                    if (msg.videoroom === 'event' && msg.unpublished && String(msg.unpublished) === String(subscribedFeedId)) {
+                      setStatus('waiting', 'Publisher went offline', 'Waiting for the next active publisher');
+                    }
+                  }
+                });
+              },
+              error(error) {
+                setStatus('error', 'Janus session failed', error);
+                log(`Janus session failed: ${error}`);
+              },
+              destroyed() {
+                setStatus('error', 'Janus session closed', 'Reload the page to try again.');
+                log('Janus session destroyed');
+              }
+            });
+          }
+        });
+      }
+
+      start().catch(error => {
+        setStatus('error', 'Watch page failed to load', error.message);
+        log(error.stack || error.message);
+      });
+    </script>
+  </body>
+</html>

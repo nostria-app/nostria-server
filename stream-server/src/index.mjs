@@ -1,5 +1,8 @@
 import express from 'express';
 import http from 'http';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import httpProxy from 'http-proxy';
 import { JanusWhipServer } from 'janus-whip-server';
 
 function parseBoolean(value, defaultValue) {
@@ -44,6 +47,9 @@ function parseRoomId(value) {
 
 async function main() {
   const app = express();
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const publicDir = path.join(__dirname, '..', 'public');
   const httpPort = Number.parseInt(process.env.WHIP_PORT || '7080', 10);
   const basePath = process.env.WHIP_BASE_PATH || '/whip';
   const endpointId = process.env.WHIP_ENDPOINT_ID || 'live';
@@ -51,10 +57,52 @@ async function main() {
   const endpointToken = process.env.WHIP_ENDPOINT_TOKEN || undefined;
   const roomId = parseRoomId(process.env.WHIP_ROOM_ID || '1234');
   const janusWsUrl = process.env.JANUS_WS_URL || 'ws://janus:8188';
+  const janusHttpUrl = process.env.JANUS_HTTP_URL || 'http://janus:8088/janus';
   const debugLevel = process.env.WHIP_DEBUG_LEVEL || 'info';
   const iceServers = parseIceServers(process.env.WHIP_ICE_SERVERS || '[]');
+  const janusProxy = httpProxy.createProxyServer({
+    target: janusHttpUrl,
+    changeOrigin: true,
+    xfwd: true
+  });
 
   let whipServer;
+
+  janusProxy.on('error', (error, req, res) => {
+    console.error('Janus proxy error:', error.message);
+    if (res && typeof res.writeHead === 'function' && !res.headersSent) {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Janus proxy unavailable' }));
+      return;
+    }
+
+    if (res && typeof res.destroy === 'function') {
+      res.destroy();
+    }
+  });
+
+  app.get('/', (_req, res) => {
+    res.redirect('/watch/');
+  });
+
+  app.get('/watch/config.json', (_req, res) => {
+    const protocol = process.env.PUBLIC_JANUS_PROTOCOL || 'auto';
+    const janusPath = '/janus';
+    res.json({
+      roomId,
+      endpointId,
+      endpointLabel,
+      janusPath,
+      janusProtocol: protocol,
+      janusHttpUrl: janusPath
+    });
+  });
+
+  app.use('/watch', express.static(publicDir, { extensions: ['html'] }));
+
+  app.use('/janus', (req, res) => {
+    janusProxy.web(req, res);
+  });
 
   app.get('/healthz', (_req, res) => {
     res.json({
