@@ -1,6 +1,6 @@
-# Override the domain thats is used in the blobs "url" field
-# By default it uses the domain the incoming HTTP request was made on
-publicDomain: "https://media.openresist.com"
+# Blossom uses the incoming HTTP request host for the blobs "url" field by default.
+# Leave publicDomain unset so uploads through mibo.nostria.app, milo.nostria.app,
+# or media.openresist.com keep the caller-facing hostname in the returned URL.
 
 databasePath: data/sqlite.db
 

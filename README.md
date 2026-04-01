@@ -66,7 +66,7 @@ The local media server deployment lives in `media-server/`.
 
 It mirrors the tracked Blossom configuration from `nostria-infrastructure/config/media/config.yml`, uses the current upstream image `ghcr.io/nostria-app/nostria-media:latest`, listens locally on `127.0.0.1:3000`, and stores persistent data under `/mnt/data/openresist/media`.
 
-The intended public hostnames for this service are `media.openresist.com`, `mibo.nostria.app`, and `milo.nostria.app`.
+The intended public hostnames for this service are `media.openresist.com`, `mibo.nostria.app`, and `milo.nostria.app`. Returned media URLs follow the hostname used on the incoming upload request.
 
 Quick start:
 

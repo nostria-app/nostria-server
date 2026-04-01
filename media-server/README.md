@@ -2,7 +2,7 @@
 
 This deploys the local Nostria media server on the current Ubuntu host, replacing the cloud-hosted media instances with the same base Blossom configuration used in `nostria-infrastructure`.
 
-The intended public hostname for this local replacement is `media.openresist.com`.
+The intended public hostnames for this local replacement are `media.openresist.com`, `mibo.nostria.app`, and `milo.nostria.app`. Returned media URLs follow the hostname used on the incoming upload request.
 
 The container image follows the current infrastructure choice:
 
@@ -13,7 +13,7 @@ The service listens locally on `127.0.0.1:3000` and stores persistent data under
 ## Files
 
 - `docker-compose.yml`: local media service definition
-- `config/config.yml`: tracked config template mirrored from infrastructure
+- `config/config.yml`: tracked config template mirrored from infrastructure, with request-host-based media URLs
 - `.env.example`: dashboard password example
 - `scripts/bootstrap.sh`: creates data dirs, installs config, pulls the current image, and starts the service
 - `scripts/status.sh`: prints compose status and current container resource use
@@ -27,6 +27,8 @@ All persistent media data lives under `/mnt/data/openresist/media`:
 - `config.yml`: runtime Blossom config copied from the tracked template on first bootstrap
 - `data/sqlite.db`: metadata database
 - `data/blobs/`: local blob storage
+
+Keep `publicDomain` unset in the runtime config if you want the media server to return URLs on the same hostname the client used for the upload request.
 
 ## Start
 
