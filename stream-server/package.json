@@ -1,0 +1,17 @@
+{
+  "name": "openresist-stream-server",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Local WHIP server wrapper for openresist",
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "scripts": {
+    "start": "node src/index.mjs"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "janus-whip-server": "^1.1.0"
+  }
+}

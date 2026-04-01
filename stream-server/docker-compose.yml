@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  janus:
+    image: canyan/janus-gateway:latest
+    container_name: openresist-stream-janus
+    restart: unless-stopped
+    ports:
+      - "20000-20100/udp"
+    volumes:
+      - /mnt/data/openresist/stream-server/janus/janus.jcfg:/usr/local/etc/janus/janus.jcfg:ro
+      - /mnt/data/openresist/stream-server/janus/janus.transport.websockets.jcfg:/usr/local/etc/janus/janus.transport.websockets.jcfg:ro
+      - /mnt/data/openresist/stream-server/janus/janus.plugin.videoroom.jcfg:/usr/local/etc/janus/janus.plugin.videoroom.jcfg:ro
+
+  stream-server:
+    build:
+      context: .
+    container_name: openresist-stream-server
+    restart: unless-stopped
+    depends_on:
+      - janus
+    ports:
+      - "127.0.0.1:7080:7080"
+    environment:
+      JANUS_WS_URL: "ws://janus:8188"
+      WHIP_PORT: "7080"
+      WHIP_BASE_PATH: "${WHIP_BASE_PATH}"
+      WHIP_ENDPOINT_ID: "${WHIP_ENDPOINT_ID}"
+      WHIP_ROOM_ID: "${WHIP_ROOM_ID}"
+      WHIP_ENDPOINT_LABEL: "${WHIP_ENDPOINT_LABEL}"
+      WHIP_ENDPOINT_TOKEN: "${WHIP_ENDPOINT_TOKEN}"
+      WHIP_ALLOW_TRICKLE: "${WHIP_ALLOW_TRICKLE}"
+      WHIP_STRICT_ETAGS: "${WHIP_STRICT_ETAGS}"
+      WHIP_ICE_SERVERS: "${WHIP_ICE_SERVERS}"
+      WHIP_DEBUG_LEVEL: "${WHIP_DEBUG_LEVEL}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7080/healthz').then(response => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

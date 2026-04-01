@@ -81,3 +81,32 @@ Route `media.openresist.com`, `mibo.nostria.app`, and `milo.nostria.app` through
 Legacy hostnames `mibo.eu.nostria.app` and `mibo.us.nostria.app` should be handled with HTTP redirects on the `nostria.app` side to `https://mibo.nostria.app` and `https://milo.nostria.app` respectively.
 
 See `media-server/README.md` for the full setup and operations guide.
+
+## Stream Server
+
+The local WHIP ingest deployment lives in `stream-server/`.
+
+It runs `simple-whip-server` on top of a local Janus backend, listens for WHIP HTTP signaling on `127.0.0.1:7080`, and stores generated Janus runtime config under `/mnt/data/openresist/stream-server`.
+
+The intended public hostname for this service is `stream.openresist.com`.
+
+Quick start:
+
+```bash
+cd stream-server
+cp .env.example .env
+bash ./scripts/bootstrap.sh
+```
+
+Expose the WHIP HTTP origin through Cloudflare Tunnel with:
+
+```bash
+cd /home/blockcore/src/nostria/nostria-server
+sudo ./scripts/update-cloudflared-ingress.sh \
+	--hostname stream.openresist.com \
+	--service http://127.0.0.1:7080
+```
+
+Important: Cloudflare Tunnel only carries the WHIP HTTP signaling traffic. Janus media still needs direct UDP reachability on the host for the configured RTP range, and if this machine is behind NAT you must provide the public IP or working STUN settings for Janus.
+
+See `stream-server/README.md` for the full setup and operations guide.

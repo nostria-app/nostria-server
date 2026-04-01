@@ -1,0 +1,11 @@
+general: {
+}
+
+room-__JANUS_ROOM_ID__: {
+        description = "__JANUS_ROOM_DESCRIPTION__"
+        publishers = __JANUS_ROOM_PUBLISHERS__
+        bitrate = 2500000
+        fir_freq = 10
+        record = false
+__JANUS_ROOM_SECRET_BLOCK____JANUS_ROOM_PIN_BLOCK__
+}
