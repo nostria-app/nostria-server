@@ -73,6 +73,7 @@ After bootstrap, the local HTTP endpoints are:
 - `GET http://127.0.0.1:7080/endpoints`
 - `GET http://127.0.0.1:7080/admin/endpoints` with `Authorization: Bearer <STREAM_ADMIN_TOKEN>`
 - `POST http://127.0.0.1:7080/admin/endpoints/<id>/reset` with `Authorization: Bearer <STREAM_ADMIN_TOKEN>`
+- `POST http://127.0.0.1:7080/api/streams` with NIP-98 auth to mint a new premium stream endpoint
 - `GET http://127.0.0.1:7080/watch/`
 - `POST http://127.0.0.1:7080/whip/endpoint/live` by default
 - `POST http://127.0.0.1:7080/whip/endpoint/browser` for browser-specific publishers
@@ -80,6 +81,32 @@ After bootstrap, the local HTTP endpoints are:
 If you set `WHIP_ENDPOINT_TOKEN`, clients must send it as a Bearer token.
 
 `STREAM_ADMIN_TOKEN` protects the admin routes for listing and resetting endpoints without restarting the container. Keeping it distinct from `WHIP_ENDPOINT_TOKEN` is recommended.
+
+`POST /api/streams` is protected by NIP-98 HTTP auth. The request must include an `Authorization: Nostr <base64-kind-27235-event>` header whose `u` tag matches the exact absolute URL and whose `method` tag is `POST`. On success, the server verifies the caller's premium status via `NOSTRIA_ACCOUNT_API_BASE/<pubkey>` and returns a fresh random WHIP endpoint and per-stream bearer token. The endpoint id is random, never derived from the Nostr pubkey, and is automatically destroyed after the stream ends or after `DYNAMIC_ENDPOINT_TTL_SECONDS` if unused.
+
+Dynamic stream creation response shape:
+
+```json
+{
+  "success": true,
+  "result": {
+    "pubkey": "<caller pubkey>",
+    "subscriptionTier": "premium_plus",
+    "stream": {
+      "id": "<random endpoint id>",
+      "url": "https://stream.openresist.com/whip/endpoint/<random endpoint id>",
+      "token": "<random bearer token>",
+      "authorization": {
+        "scheme": "Bearer",
+        "token": "<random bearer token>"
+      },
+      "createdAt": "<iso timestamp>",
+      "expiresAt": "<iso timestamp>",
+      "roomId": 1234
+    }
+  }
+}
+```
 
 `WHIP_ICE_SERVERS` accepts either a comma-separated URI list like `stun:stun.cloudflare.com:3478,turn:turn.example.com?transport=udp` or a JSON object/array when you need usernames and credentials.
 
