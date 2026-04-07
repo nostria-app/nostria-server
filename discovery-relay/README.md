@@ -77,6 +77,8 @@ cd /home/blockcore/src/nostria/nostria-server/discovery-relay
 
 This imports discovery relay history as kinds `3` and `10002` only from the configured discovery relays. It also pulls kind `10002` from Coracle as an extra relay-list source.
 
+The relay itself is also configured to reject any incoming event whose kind is not `3` or `10002`, and to reject REQ filters that ask for other kinds.
+
 Current upstreams:
 
 - `wss://purplepag.es/`

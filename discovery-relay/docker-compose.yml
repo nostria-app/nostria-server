@@ -21,6 +21,7 @@ services:
     memswap_limit: 96g
     volumes:
       - ./config/strfry.conf:/etc/strfry.conf:ro
+      - ./config/strfry-kind-allow.pl:/etc/strfry-kind-allow.pl:ro
       - /mnt/data/openresist/discovery-relay/db:/var/lib/strfry/db
       - /mnt/data/openresist/discovery-relay/log:/var/log/strfry
 
@@ -33,3 +34,4 @@ services:
     command: ["--config", "/etc/strfry.conf", "scan", "{}"]
     volumes:
       - ./config/strfry.conf:/etc/strfry.conf:ro
+      - ./config/strfry-kind-allow.pl:/etc/strfry-kind-allow.pl:ro
