@@ -17,9 +17,16 @@ The helper scripts auto-detect whether to use `docker compose` or legacy `docker
 
 ## What It Runs
 
-- `strfry-relay`: the local relay process bound to `127.0.0.1:7777`
+- `strfry-main`: the local relay process bound to `127.0.0.1:7777`
+- `strfry-relay`: compatibility placeholder service name kept only so stale live-sync processes cannot contend with the LMDB database
+- `strfry-sync`: ephemeral worker containers used by live-sync without mounting the LMDB database
 
-Manual and scheduled syncs reuse the `strfry-relay` service definition instead of a separate sync container definition.
+The relay container is configured with a high memory ceiling for this host:
+
+- memory limit: `96g`
+- memory reservation: `16g`
+
+Scheduled historical syncs reuse `strfry-main` because they write directly to the LMDB database. Live websocket sync workers use the separate `strfry-sync` service so they do not mount the relay database.
 
 The image is built locally from the workspace copy of `../../strfry`, which is expected to be checked out at Strfry `1.1.0`.
 
@@ -41,6 +48,7 @@ All persistent data is stored under `/mnt/data/openresist/discovery-relay`:
 - `scripts/live-sync-status.sh`: shows relay state, live sync status, worker counts, and recent live-sync logs
 - `scripts/install-sync-timer.sh`: installs a systemd timer for scheduled syncs
 - `scripts/install-live-sync-service.sh`: installs a persistent systemd service for the live-sync supervisor
+- `scripts/install-systemd-jobs.sh`: installs both persistent systemd jobs together
 - `systemd/openresist-discovery-sync.service`: oneshot sync job
 - `systemd/openresist-discovery-sync.timer`: daily schedule for the sync job
 - `systemd/openresist-discovery-live-sync.service`: persistent live-sync supervisor
@@ -91,6 +99,15 @@ sudo ./scripts/install-sync-timer.sh
 ```
 
 The default schedule is daily at `03:15`. Adjust `OnCalendar` in `systemd/openresist-discovery-sync.timer` if you want a different cadence.
+
+To install both the scheduled sync timer and the persistent live-sync supervisor together, run:
+
+```bash
+cd /home/blockcore/src/nostria/nostria-server/discovery-relay
+sudo bash ./scripts/install-systemd-jobs.sh
+```
+
+Both units are enabled in systemd, so they survive host restarts.
 
 ## Cloudflare Tunnel
 
@@ -172,6 +189,12 @@ Install persistent live-sync supervision with systemd:
 sudo bash ./scripts/install-live-sync-service.sh
 systemctl status openresist-discovery-live-sync.service
 journalctl -u openresist-discovery-live-sync.service -n 100
+```
+
+Or install both persistent jobs at once:
+
+```bash
+sudo bash ./scripts/install-systemd-jobs.sh
 ```
 
 Check discovery data counts:

@@ -5,11 +5,16 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "$SCRIPT_DIR/live-sync-common.sh"
 
 RETRY_SLEEP_SECONDS=${LIVE_SYNC_RETRY_SLEEP_SECONDS:-5}
-LOCAL_RELAY_URL=${LOCAL_RELAY_URL:-ws://strfry-relay:7777}
+LOCAL_RELAY_URL=${LOCAL_RELAY_URL:-ws://strfry-main:7777}
 DISCOVERY_FILTER_TEMPLATE='{"kinds":[3,10002],"since":%s}'
+LIVE_SYNC_PID_FILE=$(get_live_sync_pid_file)
 
 log() {
     printf '[%s] %s\n' "$(date -Is)" "$*"
+}
+
+run_sync_worker() {
+    compose run --rm --no-deps "$SYNC_WORKER_SERVICE_NAME" "$@"
 }
 
 ensure_relay_running() {
@@ -44,9 +49,9 @@ run_follow_local_to_remote_loop() {
 
         log "[$label] following local relay $filter_description into $remote_url since=$since"
         set +e
-        compose run --rm --no-deps "$SERVICE_NAME" \
+        run_sync_worker \
             --config /etc/strfry.conf download --follow "$LOCAL_RELAY_URL" --filter "$filter" \
-            | compose run --rm --no-deps -T "$SERVICE_NAME" \
+            | compose run --rm --no-deps -T "$SYNC_WORKER_SERVICE_NAME" \
                 --config /etc/strfry.conf upload "$remote_url"
         local pipeline_exit=$?
         set -e
@@ -72,9 +77,9 @@ run_follow_remote_to_local_loop() {
 
         log "[$label] following $filter_description from $remote_url into $LOCAL_RELAY_URL since=$since"
         set +e
-        compose run --rm --no-deps "$SERVICE_NAME" \
+        run_sync_worker \
             --config /etc/strfry.conf download --follow "$remote_url" --filter "$follow_filter" \
-            | compose run --rm --no-deps -T "$SERVICE_NAME" \
+            | compose run --rm --no-deps -T "$SYNC_WORKER_SERVICE_NAME" \
                 --config /etc/strfry.conf upload "$LOCAL_RELAY_URL"
         local pipeline_exit=$?
         set -e
@@ -92,9 +97,12 @@ cleanup() {
         kill "$pid" >/dev/null 2>&1 || true
     done
     wait >/dev/null 2>&1 || true
+    rm -f "$LIVE_SYNC_PID_FILE"
 }
 
 trap cleanup EXIT INT TERM
+
+echo "$$" > "$LIVE_SYNC_PID_FILE"
 
 log "Live sync supervisor starting for Coracle, Purple Pages, Primal, and Damus"
 

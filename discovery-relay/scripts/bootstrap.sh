@@ -51,8 +51,15 @@ fi
 echo "Building and starting discovery relay stack..."
 
 cd "$PROJECT_DIR"
-$COMPOSE_CMD up -d --build strfry-relay
+$COMPOSE_CMD up -d --build strfry-main
 
 echo "Discovery relay is starting on 127.0.0.1:7777"
 echo "Cloudflare Tunnel origin should target: http://127.0.0.1:7777"
 echo "Use scripts/initial-sync.sh when you want to run a manual discovery data sync."
+
+if systemctl list-unit-files openresist-discovery-sync.timer >/dev/null 2>&1 \
+    && systemctl list-unit-files openresist-discovery-live-sync.service >/dev/null 2>&1; then
+    echo "Persistent discovery sync jobs are installed with systemd."
+else
+    echo "To make discovery sync jobs survive reboot, run: sudo bash ./scripts/install-systemd-jobs.sh"
+fi

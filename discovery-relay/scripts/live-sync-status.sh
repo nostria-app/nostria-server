@@ -11,7 +11,7 @@ status_label() {
 }
 
 relay_container_count=$(compose ps --services --filter status=running 2>/dev/null | grep -cx "$SERVICE_NAME" || true)
-run_container_count=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -Ec '^discovery-relay_strfry-relay_run_' || true)
+run_container_count=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -Ec "^${COMPOSE_PROJECT_NAME}_(strfry-sync|${SERVICE_NAME})_run_" || true)
 PID_FILE=$(get_live_sync_pid_file)
 LOG_FILE=$(get_live_sync_log_file)
 
@@ -23,7 +23,21 @@ fi
 
 live_sync_status="stopped"
 live_sync_pid="-"
-if [[ -f "$PID_FILE" ]]; then
+
+systemd_unit_present=false
+systemd_state=""
+if systemctl list-unit-files openresist-discovery-live-sync.service >/dev/null 2>&1; then
+    systemd_unit_present=true
+    systemd_state=$(systemctl is-active openresist-discovery-live-sync.service 2>/dev/null || true)
+fi
+
+if [[ "$systemd_unit_present" == "true" && "$systemd_state" == "active" ]]; then
+    live_sync_status="running"
+    live_sync_pid=$(systemctl show -p MainPID --value openresist-discovery-live-sync.service 2>/dev/null || true)
+    if [[ -z "$live_sync_pid" || "$live_sync_pid" == "0" ]]; then
+        live_sync_pid="-"
+    fi
+elif [[ -f "$PID_FILE" ]]; then
     live_sync_pid=$(cat "$PID_FILE")
     if kill -0 "$live_sync_pid" >/dev/null 2>&1; then
         live_sync_status="running"
@@ -39,8 +53,7 @@ status_label "Relay containers" "$relay_container_count"
 status_label "Worker containers" "$run_container_count"
 status_label "Log file" "$LOG_FILE"
 
-if systemctl list-unit-files openresist-discovery-live-sync.service >/dev/null 2>&1; then
-    systemd_state=$(systemctl is-active openresist-discovery-live-sync.service 2>/dev/null || true)
+if [[ "$systemd_unit_present" == "true" ]]; then
     status_label "Systemd unit" "$systemd_state"
 fi
 

@@ -4,7 +4,9 @@ set -euo pipefail
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
-SERVICE_NAME="strfry-relay"
+MAIN_SERVICE_NAME="strfry-main"
+SERVICE_NAME="$MAIN_SERVICE_NAME"
+SYNC_WORKER_SERVICE_NAME="strfry-sync"
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-$(basename "$PROJECT_DIR")}
 DATA_ROOT="/mnt/data/openresist/discovery-relay"
 LOG_DIR="$DATA_ROOT/log"
@@ -43,14 +45,24 @@ relay_running() {
 
 cleanup_live_sync_workers() {
     local worker_ids
+    local worker_name_filter
 
     if ! command -v docker >/dev/null 2>&1; then
         return
     fi
 
+    worker_name_filter="name=${COMPOSE_PROJECT_NAME}_${SYNC_WORKER_SERVICE_NAME}_run_"
     worker_ids=$(docker ps -aq \
+        --filter "$worker_name_filter" \
+        --filter "status=running")
+
+    legacy_worker_ids=$(docker ps -aq \
         --filter "name=${COMPOSE_PROJECT_NAME}_${SERVICE_NAME}_run_" \
         --filter "status=running")
+
+    if [[ -n "${legacy_worker_ids:-}" ]]; then
+        worker_ids="$worker_ids $legacy_worker_ids"
+    fi
 
     if [[ -n "$worker_ids" ]]; then
         docker rm -f $worker_ids >/dev/null

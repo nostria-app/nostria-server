@@ -1,21 +1,35 @@
-version: "3.8"
+x-strfry-common: &strfry-common
+  build:
+    context: ../../strfry
+    dockerfile: ubuntu.Dockerfile
+  image: nostria/strfry:1.1.0-local
+  ulimits:
+    nofile:
+      soft: 500000
+      hard: 500000
 
 services:
-  strfry-relay:
-    build:
-      context: ../../strfry
-      dockerfile: ubuntu.Dockerfile
-    image: nostria/strfry:1.1.0-local
+  strfry-main:
+    <<: *strfry-common
     container_name: openresist-discovery-relay
     restart: unless-stopped
     command: ["--config", "/etc/strfry.conf", "relay"]
     ports:
       - "127.0.0.1:7777:7777"
-    ulimits:
-      nofile:
-        soft: 500000
-        hard: 500000
+    mem_limit: 96g
+    mem_reservation: 16g
+    memswap_limit: 96g
     volumes:
       - ./config/strfry.conf:/etc/strfry.conf:ro
       - /mnt/data/openresist/discovery-relay/db:/var/lib/strfry/db
       - /mnt/data/openresist/discovery-relay/log:/var/log/strfry
+
+  strfry-relay:
+    <<: *strfry-common
+    command: ["bash", "-lc", "trap 'exit 0' TERM INT; while true; do sleep 3600; done"]
+
+  strfry-sync:
+    <<: *strfry-common
+    command: ["--config", "/etc/strfry.conf", "scan", "{}"]
+    volumes:
+      - ./config/strfry.conf:/etc/strfry.conf:ro
