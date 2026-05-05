@@ -82,6 +82,59 @@ Legacy hostnames `mibo.eu.nostria.app` and `mibo.us.nostria.app` should be handl
 
 See `media-server/README.md` for the full setup and operations guide.
 
+## AI Server
+
+The local AI API deployment for `ai.nostria.app` lives in `ai-server/`.
+
+It runs `llama-server` from llama.cpp, exposes an OpenAI-compatible API on `127.0.0.1:8088`, and stores downloaded GGUF models plus cache data under `/mnt/data/openresist/ai-server`.
+
+Quick start:
+
+```bash
+cd ai-server
+bash ./scripts/download-model.sh scout
+bash ./scripts/select-model.sh llama-4-scout/<downloaded-file>.gguf llama-4-scout
+bash ./scripts/bootstrap.sh
+```
+
+Expose the API through Cloudflare Tunnel with:
+
+```bash
+cd /home/blockcore/src/nostria/nostria-server
+sudo ./scripts/update-cloudflared-ingress.sh \
+	--hostname ai.nostria.app \
+	--service http://127.0.0.1:8088
+```
+
+See `ai-server/README.md` for the model download, switching, API, and memory guidance.
+
+## AI Image Server
+
+The local image-generation API deployment for `ai-image.nostria.app` lives in `ai-image-server/`.
+
+It runs ComfyUI behind an API-key gateway, exposes local HTTP on `127.0.0.1:8090`, and stores model files, generated images, user data, and cache files under `/mnt/data/openresist/ai-image-server`.
+
+Quick start:
+
+```bash
+cd ai-image-server
+bash ./scripts/bootstrap.sh --no-start
+bash ./scripts/download-model.sh --dry-run z-image-turbo
+bash ./scripts/download-model.sh z-image-turbo
+bash ./scripts/bootstrap.sh
+```
+
+Expose the API through Cloudflare Tunnel with:
+
+```bash
+cd /home/blockcore/src/nostria/nostria-server
+sudo ./scripts/update-cloudflared-ingress.sh \
+	--hostname ai-image.nostria.app \
+	--service http://127.0.0.1:8090
+```
+
+See `ai-image-server/README.md` for model downloads, ComfyUI API usage, and model-switching guidance.
+
 ## Stream Server
 
 The local WHIP ingest deployment lives in `stream-server/`.

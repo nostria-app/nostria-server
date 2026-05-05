@@ -1,0 +1,10 @@
+{
+  "name": "nostria-ai-image-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "express": "^5.2.1",
+    "http-proxy-middleware": "^4.0.0"
+  }
+}

@@ -1,0 +1,47 @@
+services:
+  comfyui:
+    build:
+      context: .
+      dockerfile: Dockerfile.comfyui
+      args:
+        PYTORCH_IMAGE: ${PYTORCH_IMAGE:-pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime}
+        COMFYUI_REF: ${COMFYUI_REF:-master}
+    image: nostria-ai-image-comfyui:latest
+    container_name: openresist-ai-image-comfyui
+    restart: unless-stopped
+    environment:
+      COMFYUI_EXTRA_ARGS: ${COMFYUI_EXTRA_ARGS:---cpu}
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+    expose:
+      - "8188"
+    volumes:
+      - /mnt/data/openresist/ai-image-server/models:/app/ComfyUI/models
+      - /mnt/data/openresist/ai-image-server/input:/app/ComfyUI/input
+      - /mnt/data/openresist/ai-image-server/output:/app/ComfyUI/output
+      - /mnt/data/openresist/ai-image-server/user:/app/ComfyUI/user
+      - /mnt/data/openresist/ai-image-server/custom_nodes:/app/ComfyUI/custom_nodes
+      - /mnt/data/openresist/ai-image-server/cache:/root/.cache
+    shm_size: "2gb"
+    # Uncomment on hosts with the NVIDIA Container Toolkit configured.
+    # gpus: all
+
+  image-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: nostria-ai-image-api:latest
+    container_name: openresist-ai-image-api
+    restart: unless-stopped
+    depends_on:
+      - comfyui
+    environment:
+      IMAGE_API_KEY: ${IMAGE_API_KEY:-}
+      COMFYUI_BASE_URL: http://comfyui:8188
+      MODEL_ROOT: /models
+      PORT: "8090"
+    ports:
+      - "127.0.0.1:${AI_IMAGE_SERVER_HOST_PORT:-8090}:8090"
+    volumes:
+      - /mnt/data/openresist/ai-image-server/models:/models:ro
+      - /mnt/data/openresist/ai-image-server/output:/output:ro
