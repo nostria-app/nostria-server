@@ -5,5 +5,6 @@ COPY api/package.json ./package.json
 RUN npm install --omit=dev
 
 COPY api/server.mjs ./server.mjs
+COPY api/public ./public
 
 CMD ["node", "server.mjs"]

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nostria Image Generator</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Nostria</p>
+            <h1>Image Generator</h1>
+          </div>
+          <div class="status-strip">
+            <span id="healthBadge" class="badge">Checking</span>
+            <a class="link-button" href="https://comfy.nostria.app" target="_blank" rel="noreferrer">ComfyUI</a>
+          </div>
+        </header>
+
+        <form id="generatorForm" class="generator-form">
+          <label class="field field-wide">
+            <span>Prompt</span>
+            <textarea id="prompt" rows="5" placeholder="A quiet Nordic reading room with brass lamps, rain on tall windows, cinematic natural light" required></textarea>
+          </label>
+
+          <label class="field field-wide">
+            <span>Negative Prompt</span>
+            <textarea id="negativePrompt" rows="2" placeholder="low quality, blurry, distorted hands, watermark"></textarea>
+          </label>
+
+          <label class="field">
+            <span>Model</span>
+            <select id="model"></select>
+          </label>
+
+          <label class="field">
+            <span>Size</span>
+            <select id="size">
+              <option value="1024x1024">Square 1024</option>
+              <option value="832x1216">Portrait 832 x 1216</option>
+              <option value="1216x832">Landscape 1216 x 832</option>
+              <option value="768x768">Square 768</option>
+              <option value="512x512">Small 512</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Steps</span>
+            <input id="steps" type="number" min="1" max="80" step="1" value="4">
+          </label>
+
+          <label class="field">
+            <span>Guidance</span>
+            <input id="guidance" type="number" min="0" max="20" step="0.1" value="3.5">
+          </label>
+
+          <label class="field">
+            <span>CFG</span>
+            <input id="cfg" type="number" min="0" max="20" step="0.1" value="1">
+          </label>
+
+          <label class="field">
+            <span>Seed</span>
+            <input id="seed" type="number" min="0" step="1" placeholder="Random">
+          </label>
+
+          <label class="field field-wide reference-field">
+            <span>Reference Image</span>
+            <input id="referenceImage" type="file" accept="image/png,image/jpeg,image/webp">
+          </label>
+
+          <label class="field">
+            <span>Reference Strength</span>
+            <input id="referenceStrength" type="range" min="0.05" max="1" step="0.05" value="0.65">
+          </label>
+
+          <div class="reference-preview">
+            <img id="referencePreview" alt="">
+            <button id="clearReferenceButton" type="button" class="ghost">Clear Reference</button>
+          </div>
+
+          <div class="actions field-wide">
+            <button id="generateButton" type="submit">Generate</button>
+            <button id="randomSeedButton" type="button" class="secondary">Random Seed</button>
+            <span id="jobStatus" class="job-status">Idle</span>
+          </div>
+        </form>
+      </section>
+
+      <aside class="side-panel">
+        <section class="panel-section">
+          <h2>Access</h2>
+          <label class="field">
+            <span>Image API Key</span>
+            <input id="apiKey" type="password" autocomplete="off" placeholder="Paste key once">
+          </label>
+          <div class="compact-actions">
+            <button id="saveKeyButton" type="button" class="secondary">Save Key</button>
+            <button id="clearKeyButton" type="button" class="ghost">Clear</button>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <h2>Models</h2>
+          <div id="modelFiles" class="file-list">Add the API key to load model files.</div>
+        </section>
+      </aside>
+
+      <section class="gallery-panel">
+        <div class="section-heading">
+          <h2>Gallery</h2>
+          <button id="refreshButton" type="button" class="secondary">Refresh</button>
+        </div>
+        <div id="gallery" class="gallery empty-state">Generated images will appear here.</div>
+      </section>
+
+      <section class="advanced-panel">
+        <details>
+          <summary>Advanced Workflow</summary>
+          <p>Paste a complete ComfyUI API workflow JSON when a model needs a custom node graph.</p>
+          <textarea id="workflowJson" rows="12" spellcheck="false" placeholder='{"1":{"class_type":"...","inputs":{}}}'></textarea>
+          <div class="actions">
+            <button id="submitWorkflowButton" type="button" class="secondary">Submit Workflow</button>
+            <button id="clearWorkflowButton" type="button" class="ghost">Clear</button>
+          </div>
+        </details>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

@@ -17,6 +17,7 @@ FLUX.1 schnell and FLUX.2 klein on Hugging Face are gated and require accepting 
 - `Dockerfile.api`: API-key gateway image
 - `.env.example`: runtime defaults and Hugging Face repo settings
 - `api/server.mjs`: API-key gateway for ComfyUI REST endpoints
+- `api/public/`: simple Nostria Image Generator web UI
 - `scripts/bootstrap.sh`: creates data dirs, creates `.env`, builds, and starts the service
 - `scripts/download-model.sh`: downloads configured model files from Hugging Face
 - `scripts/status.sh`: prints Compose status, resource use, disk use, and health
@@ -121,6 +122,21 @@ curl "http://127.0.0.1:8090/v1/view?filename=<file>&subfolder=<subfolder>&type=o
 ```
 
 Advanced clients can proxy directly to ComfyUI through `/comfy/*` with the same API key.
+
+## Web UI
+
+The API container also serves a simple browser UI for `ai-image-ui.nostria.app`. Point that hostname at the same local gateway service as `ai-image.nostria.app`:
+
+```bash
+cd /home/blockcore/src/nostria/nostria-server
+sudo ./scripts/update-cloudflared-ingress.sh \
+  --hostname ai-image-ui.nostria.app \
+  --service http://127.0.0.1:8090
+```
+
+Open the UI and paste `IMAGE_API_KEY` once. The key is stored in browser local storage and sent to the existing `/v1/*` API routes.
+
+The normal generator form submits `/v1/generate`, which builds a basic FLUX-style ComfyUI workflow from the prompt, size, steps, CFG, guidance, seed, and optional reference image. Reference images are uploaded to ComfyUI and used as an init image through `LoadImage` + `VAEEncode`; the Reference Strength slider maps to sampler denoise, where lower values preserve more of the uploaded image. Use the Advanced Workflow editor for custom ComfyUI API JSON when a model needs a more specific graph.
 
 ## Model Switching
 
