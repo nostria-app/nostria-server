@@ -1,6 +1,6 @@
 # AI Server
 
-This deploys a local CPU-only llama.cpp API server for `ai.nostria.app` using `llama-server` and GGUF models. It exposes an OpenAI-compatible API locally on `127.0.0.1:8088` by default and stores all persistent data under `/mnt/data/openresist/ai-server`.
+This deploys a local CPU-only llama.cpp API server for `ai.nostria.app` using `llama-server` and GGUF models. It exposes an OpenAI-compatible API locally on `127.0.0.1:8088` by default, or on the LAN when `AI_SERVER_HOST_BIND=0.0.0.0`, and stores all persistent data under `/mnt/data/openresist/ai-server`.
 
 The setup is designed to keep only one large model loaded at a time. On a 128 GB RAM host, Llama 4 Scout is the safer first test. MiniMax-M2.7 at roughly 108 GB on disk may fit only when other containers and the OS leave enough headroom, especially at larger context sizes.
 

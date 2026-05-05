@@ -22,7 +22,7 @@ services:
       LLAMA_NO_MMAP: ${LLAMA_NO_MMAP:-false}
       LLAMA_EXTRA_ARGS: ${LLAMA_EXTRA_ARGS:-}
     ports:
-      - "127.0.0.1:${AI_SERVER_HOST_PORT:-8088}:8080"
+      - "${AI_SERVER_HOST_BIND:-127.0.0.1}:${AI_SERVER_HOST_PORT:-8088}:8080"
     volumes:
       - /mnt/data/openresist/ai-server/models:/models:ro
       - /mnt/data/openresist/ai-server/cache:/cache

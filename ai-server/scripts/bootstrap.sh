@@ -79,5 +79,5 @@ cd "$PROJECT_DIR"
 $COMPOSE_CMD build ai-server
 $COMPOSE_CMD up -d ai-server
 
-echo "AI server is starting on 127.0.0.1:${AI_SERVER_HOST_PORT:-8088}"
+echo "AI server is starting on ${AI_SERVER_HOST_BIND:-127.0.0.1}:${AI_SERVER_HOST_PORT:-8088}"
 echo "Persistent data root: $DATA_ROOT"

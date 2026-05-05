@@ -41,7 +41,7 @@ services:
       MODEL_ROOT: /models
       PORT: "8090"
     ports:
-      - "127.0.0.1:${AI_IMAGE_SERVER_HOST_PORT:-8090}:8090"
+      - "${AI_IMAGE_SERVER_HOST_BIND:-127.0.0.1}:${AI_IMAGE_SERVER_HOST_PORT:-8090}:8090"
     volumes:
       - /mnt/data/openresist/ai-image-server/models:/models:ro
       - /mnt/data/openresist/ai-image-server/output:/output:ro

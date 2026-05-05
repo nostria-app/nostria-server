@@ -2,7 +2,7 @@
 
 This deploys a local image-generation API for `ai-image.nostria.app` using ComfyUI behind a small API-key gateway. ComfyUI is a good fit for this server because model choice is part of the submitted workflow JSON, so clients can switch between Z-Image-Turbo, FLUX.2 klein, FLUX.1 schnell, and later models without restarting the container.
 
-The local public-facing gateway listens on `127.0.0.1:8090` by default. ComfyUI itself is only exposed on the Docker network. Persistent data lives under `/mnt/data/openresist/ai-image-server`.
+The local public-facing gateway listens on `127.0.0.1:8090` by default, or on the LAN when `AI_IMAGE_SERVER_HOST_BIND=0.0.0.0`. ComfyUI itself is only exposed on the Docker network. Persistent data lives under `/mnt/data/openresist/ai-image-server`.
 
 ## Reality Check
 

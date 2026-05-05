@@ -102,5 +102,5 @@ cd "$PROJECT_DIR"
 $COMPOSE_CMD build
 $COMPOSE_CMD up -d
 
-echo "AI image API is starting on 127.0.0.1:${AI_IMAGE_SERVER_HOST_PORT:-8090}"
+echo "AI image API is starting on ${AI_IMAGE_SERVER_HOST_BIND:-127.0.0.1}:${AI_IMAGE_SERVER_HOST_PORT:-8090}"
 echo "Persistent data root: $DATA_ROOT"
