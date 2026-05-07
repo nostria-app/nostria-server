@@ -1,0 +1,36 @@
+services:
+  stable-diffusion-cpp:
+    build:
+      context: .
+      args:
+        SDCPP_REF: ${SDCPP_REF:-master}
+    image: ${SDCPP_IMAGE:-nostria-ai-imagine:stable-diffusion-cpp}
+    container_name: openresist-ai-imagine
+    restart: unless-stopped
+    entrypoint:
+      - /bin/sh
+      - -lc
+      - >-
+        exec /sd-server
+        --listen-ip 0.0.0.0
+        --listen-port 1234
+        --serve-html-path /public/index.html
+        ${SDCPP_MODEL_ARGS:-}
+        ${SDCPP_RUNTIME_ARGS:-}
+        ${SDCPP_DEFAULT_ARGS:-}
+        ${SDCPP_EXTRA_ARGS:-}
+    environment:
+      OMP_NUM_THREADS: ${SDCPP_THREADS:-10}
+    ports:
+      - "${AI_IMAGINE_HOST_BIND:-127.0.0.1}:${AI_IMAGINE_HOST_PORT:-8090}:1234"
+    volumes:
+      - /mnt/data/openresist/ai-imagine/models:/models:ro
+      - /mnt/data/openresist/ai-image-server/models:/mnt/data/openresist/ai-image-server/models:ro
+      - /mnt/data/openresist/ai-imagine/output:/output
+      - /mnt/data/openresist/ai-imagine/cache:/cache
+      - ./public:/public:ro
+    shm_size: "2gb"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1

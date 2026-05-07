@@ -1,0 +1,26 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "tania-9-16.png"
+    }
+  },
+  "2": {
+    "class_type": "Flux2MaxImageNode",
+    "inputs": {
+      "prompt": "change the uploaded image into a cinematic cyberpunk portrait, keep the subject recognizable, neon rim light, detailed face, sharp focus",
+      "width": 768,
+      "height": 1024,
+      "seed": 123456789,
+      "prompt_upsampling": true,
+      "images": ["1", 0]
+    }
+  },
+  "3": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["2", 0],
+      "filename_prefix": "nostria_flux2_img2img"
+    }
+  }
+}

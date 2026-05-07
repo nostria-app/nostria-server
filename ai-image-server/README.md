@@ -60,7 +60,7 @@ Dry-run first so you can see the exact file count and size:
 bash ./scripts/download-model.sh --dry-run z-image-turbo
 ```
 
-Download Z-Image-Turbo:
+Download Z-Image-Turbo. The script downloads the model weights plus the small diffusers metadata/tokenizer files that ComfyUI needs to register the folder as loadable:
 
 ```bash
 bash ./scripts/download-model.sh z-image-turbo
@@ -134,9 +134,28 @@ sudo ./scripts/update-cloudflared-ingress.sh \
   --service http://127.0.0.1:8090
 ```
 
+ComfyUI can be exposed through the same gateway at `comfy.nostria.app`:
+
+```bash
+cd /home/blockcore/src/nostria/nostria-server
+cloudflared tunnel route dns --overwrite-dns b32f2b3d-45e3-4b83-9259-68c1737d59bd comfy.nostria.app
+sudo ./scripts/update-cloudflared-ingress.sh \
+  --config /etc/cloudflared/nostria-ai.yml \
+  --hostname comfy.nostria.app \
+  --service http://127.0.0.1:8090 \
+  --no-restart
+sudo systemctl restart cloudflared-nostria-ai.service
+```
+
 Open the UI and paste `IMAGE_API_KEY` once. The key is stored in browser local storage and sent to the existing `/v1/*` API routes.
 
-The normal generator form submits `/v1/generate`, which builds a basic FLUX-style ComfyUI workflow from the prompt, size, steps, CFG, guidance, seed, and optional reference image. Reference images are uploaded to ComfyUI and used as an init image through `LoadImage` + `VAEEncode`; the Reference Strength slider maps to sampler denoise, where lower values preserve more of the uploaded image. Use the Advanced Workflow editor for custom ComfyUI API JSON when a model needs a more specific graph.
+The normal generator form submits `/v1/generate`, which builds a native FLUX.1 schnell ComfyUI workflow from the prompt, size, steps, CFG, guidance, seed, and optional reference image. Reference images are uploaded to ComfyUI and used as an init image through `LoadImage` + `VAEEncode`; the Change Strength slider maps to sampler denoise, where lower values preserve more of the uploaded image.
+
+FLUX.2 klein and Z-Image-Turbo are downloaded but require dedicated ComfyUI-native workflows on this stack. They are listed as Advanced Workflow models instead of being submitted through the deprecated `DiffusersLoader`, which cannot run their newer transformer-layout repositories.
+
+Raw ComfyUI routes exposed through the gateway (`/comfy`, `/assets`, `/view`, `/prompt`, `/queue`, `/upload`, `/ws`, and related runtime paths) require the same `IMAGE_API_KEY` as the image API. Opening `/comfy` without a session shows a small API-key login page; generated images served through `/view` are not public without the key/session cookie.
+
+The ComfyUI template browser includes a `nostria_templates` library with three image-edit starter workflows: `flux1-img2img-basic-api`, `flux2-img2img-basic-api`, and `z-image-turbo-img2img-basic-api`. The versioned template sources live in `comfyui-custom-nodes/nostria_templates/example_workflows`; the running server loads them from `/mnt/data/openresist/ai-image-server/custom_nodes/nostria_templates`.
 
 ## Model Switching
 

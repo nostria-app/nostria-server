@@ -54,21 +54,25 @@ fi
 
 case "$1" in
     z-image-turbo)
+        model_key=z-image-turbo
         repo=${Z_IMAGE_REPO:-Tongyi-MAI/Z-Image-Turbo}
         pattern=${2:-${Z_IMAGE_PATTERN:-*.safetensors}}
         target_dir="$DATA_ROOT/models/diffusers/z-image-turbo"
         ;;
     flux1-schnell)
+        model_key=flux1-schnell
         repo=${FLUX1_SCHNELL_REPO:-black-forest-labs/FLUX.1-schnell}
         pattern=${2:-${FLUX1_SCHNELL_PATTERN:-*.safetensors}}
         target_dir="$DATA_ROOT/models/diffusers/flux1-schnell"
         ;;
     flux2-klein)
+        model_key=flux2-klein
         repo=${FLUX2_KLEIN_REPO:-black-forest-labs/FLUX.2-klein}
         pattern=${2:-${FLUX2_KLEIN_PATTERN:-*.safetensors}}
         target_dir="$DATA_ROOT/models/diffusers/flux2-klein"
         ;;
     */*)
+        model_key=custom
         repo=$1
         pattern=${2:-*.safetensors}
         safe_name=$(printf '%s' "$repo" | tr '/:' '--')
@@ -122,6 +126,33 @@ fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
     exit 0
+fi
+
+echo
+echo "Downloading diffusers metadata and tokenizer files"
+"$HF_CLI" download "$repo" \
+    --local-dir "$target_dir" \
+    --cache-dir "$DATA_ROOT/cache/huggingface" \
+    --exclude '*.safetensors' \
+    --exclude '*.bin' \
+    --exclude '*.pt' \
+    --exclude '*.ckpt' \
+    --exclude '*.onnx' \
+    --exclude '*.msgpack' \
+    --exclude '*.h5'
+
+if [[ "$model_key" == "flux1-schnell" ]]; then
+    echo
+    echo "Preparing native ComfyUI FLUX.1 links for Nostria Image Generator"
+    mkdir -p "$DATA_ROOT/models/diffusion_models" "$DATA_ROOT/models/text_encoders" "$DATA_ROOT/models/vae"
+    ln -sf ../diffusers/flux1-schnell/flux1-schnell.safetensors "$DATA_ROOT/models/diffusion_models/flux1-schnell.safetensors"
+    ln -sf ../diffusers/flux1-schnell/ae.safetensors "$DATA_ROOT/models/vae/ae.safetensors"
+    ln -sf ../diffusers/flux1-schnell/text_encoder/model.safetensors "$DATA_ROOT/models/text_encoders/clip_l.safetensors"
+
+    echo "Downloading FLUX.1 T5 text encoder for native ComfyUI workflow"
+    "$HF_CLI" download comfyanonymous/flux_text_encoders t5xxl_fp8_e4m3fn.safetensors \
+        --local-dir "$DATA_ROOT/models/text_encoders" \
+        --cache-dir "$DATA_ROOT/cache/huggingface"
 fi
 
 echo

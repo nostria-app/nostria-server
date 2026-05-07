@@ -1,0 +1,104 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux1-schnell.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "2": {
+    "class_type": "DualCLIPLoader",
+    "inputs": {
+      "clip_name1": "clip_l.safetensors",
+      "clip_name2": "t5xxl_fp8_e4m3fn.safetensors",
+      "type": "flux",
+      "device": "default"
+    }
+  },
+  "3": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    }
+  },
+  "4": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "tania-9-16.png"
+    }
+  },
+  "5": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": ["4", 0],
+      "upscale_method": "lanczos",
+      "width": 768,
+      "height": 1024,
+      "crop": "center"
+    }
+  },
+  "6": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": ["5", 0],
+      "vae": ["3", 0]
+    }
+  },
+  "7": {
+    "class_type": "ModelSamplingFlux",
+    "inputs": {
+      "model": ["1", 0],
+      "max_shift": 1.15,
+      "base_shift": 0.5,
+      "width": 768,
+      "height": 1024
+    }
+  },
+  "8": {
+    "class_type": "CLIPTextEncodeFlux",
+    "inputs": {
+      "clip": ["2", 0],
+      "clip_l": "turn the person into a cinematic cyberpunk portrait, neon rim light, detailed face, sharp focus",
+      "t5xxl": "turn the person into a cinematic cyberpunk portrait, neon rim light, detailed face, sharp focus",
+      "guidance": 4.5
+    }
+  },
+  "9": {
+    "class_type": "CLIPTextEncodeFlux",
+    "inputs": {
+      "clip": ["2", 0],
+      "clip_l": "blurry, distorted, low quality, extra fingers, text, watermark",
+      "t5xxl": "blurry, distorted, low quality, extra fingers, text, watermark",
+      "guidance": 4.5
+    }
+  },
+  "10": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["7", 0],
+      "seed": 123456789,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "positive": ["8", 0],
+      "negative": ["9", 0],
+      "latent_image": ["6", 0],
+      "denoise": 0.75
+    }
+  },
+  "11": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["10", 0],
+      "vae": ["3", 0]
+    }
+  },
+  "12": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["11", 0],
+      "filename_prefix": "nostria_img2img"
+    }
+  }
+}

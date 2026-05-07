@@ -10,12 +10,62 @@ const apiKey = process.env.IMAGE_API_KEY || '';
 const comfyBaseUrl = process.env.COMFYUI_BASE_URL || 'http://comfyui:8188';
 const modelRoot = process.env.MODEL_ROOT || '/models';
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'public');
+const comfyHostnames = new Set(
+  String(process.env.COMFYUI_HOSTNAMES || 'comfy.nostria.app')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+);
+
+const comfyProxy = createProxyMiddleware({
+  target: comfyBaseUrl,
+  changeOrigin: true,
+  ws: true,
+  xfwd: true
+});
+
+const comfyPrefixedProxy = createProxyMiddleware({
+  target: comfyBaseUrl,
+  changeOrigin: true,
+  pathRewrite: { '^/comfy': '' },
+  ws: true,
+  xfwd: true
+});
+
+const comfyRootPaths = [
+  '/api',
+  '/assets',
+  '/customnode',
+  '/embeddings',
+  '/extensions',
+  '/history',
+  '/internal',
+  '/interrupt',
+  '/manager',
+  '/models',
+  '/object_info',
+  '/prompt',
+  '/queue',
+  '/settings',
+  '/system_stats',
+  '/upload',
+  '/user',
+  '/userdata',
+  '/view',
+  '/workflow_templates',
+  '/ws'
+];
 
 const presets = [
   {
     id: 'flux1-schnell',
     name: 'FLUX.1 schnell',
-    modelPath: 'flux1-schnell',
+    available: true,
+    workflowType: 'native-flux',
+    unetName: 'flux1-schnell.safetensors',
+    clipName1: 'clip_l.safetensors',
+    clipName2: 't5xxl_fp8_e4m3fn.safetensors',
+    vaeName: 'ae.safetensors',
     width: 1024,
     height: 1024,
     steps: 4,
@@ -27,6 +77,8 @@ const presets = [
   {
     id: 'flux2-klein',
     name: 'FLUX.2 klein 4B',
+    available: false,
+    unavailableReason: 'FLUX.2 klein uses a newer transformer layout that needs a dedicated ComfyUI workflow. Use Advanced Workflow for now.',
     modelPath: 'flux2-klein',
     width: 1024,
     height: 1024,
@@ -39,6 +91,8 @@ const presets = [
   {
     id: 'z-image-turbo',
     name: 'Z-Image-Turbo',
+    available: false,
+    unavailableReason: 'Z-Image-Turbo is downloaded, but this ComfyUI stack cannot run it through the deprecated DiffusersLoader. Use Advanced Workflow after adding a Z-Image-native graph.',
     modelPath: 'z-image-turbo',
     width: 1024,
     height: 1024,
@@ -56,12 +110,7 @@ function requireAuth(request, response, next) {
     return;
   }
 
-  const authorization = request.get('authorization') || '';
-  const bearer = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-  const headerKey = request.get('x-api-key') || '';
-  const cookieKey = getCookie(request, 'nostria_image_api_key');
-
-  if (bearer === apiKey || headerKey === apiKey || cookieKey === apiKey) {
+  if (isAuthorized(request)) {
     next();
     return;
   }
@@ -69,8 +118,25 @@ function requireAuth(request, response, next) {
   response.status(401).json({ error: 'Unauthorized' });
 }
 
+function isAuthorized(request) {
+  const authorization = getHeader(request, 'authorization');
+  const bearer = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+  const headerKey = getHeader(request, 'x-api-key');
+  const cookieKey = getCookie(request, 'nostria_image_api_key');
+
+  return Boolean(apiKey) && (bearer === apiKey || headerKey === apiKey || cookieKey === apiKey);
+}
+
+function getHeader(request, name) {
+  if (typeof request.get === 'function') {
+    return request.get(name) || '';
+  }
+
+  return String(request.headers?.[name.toLowerCase()] || '');
+}
+
 function getCookie(request, name) {
-  const cookies = request.get('cookie') || '';
+  const cookies = getHeader(request, 'cookie');
   for (const cookie of cookies.split(';')) {
     const [rawKey, ...rawValue] = cookie.trim().split('=');
     if (rawKey === name) {
@@ -96,6 +162,90 @@ function setSessionCookie(request, response, value) {
   }
 
   response.setHeader('Set-Cookie', cookie.join('; '));
+}
+
+function clearSessionCookie(response) {
+  response.setHeader('Set-Cookie', 'nostria_image_api_key=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+}
+
+function sanitizeRedirect(value, fallback = '/comfy') {
+  const redirect = String(value || fallback);
+  if (!redirect.startsWith('/') || redirect.startsWith('//')) {
+    return fallback;
+  }
+
+  return redirect;
+}
+
+function renderComfyLogin(response, redirect = '/comfy', error = '') {
+  response.setHeader('Cache-Control', 'no-store');
+  response.status(error ? 401 : 200).type('html').send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nostria ComfyUI Access</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #101310; color: #eef2eb; }
+    body { min-height: 100vh; display: grid; place-items: center; margin: 0; padding: 24px; }
+    main { width: min(420px, 100%); display: grid; gap: 18px; }
+    h1 { margin: 0; font-size: 1.45rem; font-weight: 700; }
+    p { margin: 0; color: #b7c0b2; line-height: 1.5; }
+    form { display: grid; gap: 12px; }
+    label { display: grid; gap: 8px; color: #dbe5d6; font-size: .92rem; }
+    input { border: 1px solid #394334; border-radius: 6px; padding: 12px; background: #171c16; color: #eef2eb; font: inherit; }
+    button { border: 0; border-radius: 6px; padding: 12px 14px; background: #91d66f; color: #10200a; font: inherit; font-weight: 700; cursor: pointer; }
+    .error { color: #ffb0a2; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Nostria ComfyUI Access</h1>
+    <p>Enter the image API key to open ComfyUI and view generated images.</p>
+    ${error ? `<p class="error">${error}</p>` : ''}
+    <form method="post" action="/comfy/session">
+      <input type="hidden" name="redirect" value="${redirect.replaceAll('&', '&amp;').replaceAll('"', '&quot;')}">
+      <label>
+        API key
+        <input name="apiKey" type="password" autocomplete="current-password" autofocus required>
+      </label>
+      <button type="submit">Continue</button>
+    </form>
+  </main>
+</body>
+</html>`);
+}
+
+function requireComfyAuth(request, response, next) {
+  if (isAuthorized(request)) {
+    response.setHeader('Cache-Control', 'no-store');
+    next();
+    return;
+  }
+
+  const queryKey = String(request.query.api_key || request.query.key || '');
+  if (apiKey && queryKey === apiKey) {
+    const redirectUrl = new URL(request.originalUrl, 'http://localhost');
+    redirectUrl.searchParams.delete('api_key');
+    redirectUrl.searchParams.delete('key');
+    setSessionCookie(request, response, queryKey);
+    response.redirect(303, sanitizeRedirect(`${redirectUrl.pathname}${redirectUrl.search}`));
+    return;
+  }
+
+  const acceptsHtml = request.method === 'GET' && (request.accepts(['html', 'json', 'text']) === 'html');
+  const isDocumentRequest = acceptsHtml && (!request.get('sec-fetch-dest') || request.get('sec-fetch-dest') === 'document');
+  if (isDocumentRequest && (request.path === '/' || request.path === '/comfy' || request.path === '/comfy/')) {
+    renderComfyLogin(response, sanitizeRedirect(request.originalUrl));
+    return;
+  }
+
+  if (isDocumentRequest) {
+    response.redirect(303, `/comfy/access?redirect=${encodeURIComponent(sanitizeRedirect(request.originalUrl))}`);
+    return;
+  }
+
+  response.status(401).type('text').send('Unauthorized');
 }
 
 async function listFiles(directory, baseDirectory = directory) {
@@ -167,9 +317,12 @@ function buildFluxWorkflow(options) {
   const seed = safeSeed(options.seed);
   const prompt = String(options.prompt || '').trim();
   const negativePrompt = String(options.negativePrompt || '').trim();
-  const modelPath = String(options.modelPath || preset.modelPath);
   const referenceImage = options.referenceImage && typeof options.referenceImage === 'object' ? options.referenceImage : null;
   const referenceStrength = numberInRange(options.referenceStrength, 0.65, 0.05, 1);
+
+  if (!preset.available) {
+    throw new Error(preset.unavailableReason || `${preset.name} is not available for one-click generation yet.`);
+  }
 
   if (!prompt) {
     throw new Error('Prompt is required');
@@ -177,10 +330,26 @@ function buildFluxWorkflow(options) {
 
   const workflow = {
     '1': {
-      class_type: 'DiffusersLoader',
-      inputs: { model_path: modelPath }
+      class_type: 'UNETLoader',
+      inputs: {
+        unet_name: preset.unetName,
+        weight_dtype: 'default'
+      }
     },
     '2': {
+      class_type: 'DualCLIPLoader',
+      inputs: {
+        clip_name1: preset.clipName1,
+        clip_name2: preset.clipName2,
+        type: 'flux',
+        device: 'default'
+      }
+    },
+    '3': {
+      class_type: 'VAELoader',
+      inputs: { vae_name: preset.vaeName }
+    },
+    '4': {
       class_type: 'ModelSamplingFlux',
       inputs: {
         model: ['1', 0],
@@ -190,19 +359,19 @@ function buildFluxWorkflow(options) {
         height
       }
     },
-    '3': {
+    '5': {
       class_type: 'CLIPTextEncodeFlux',
       inputs: {
-        clip: ['1', 1],
+        clip: ['2', 0],
         clip_l: prompt,
         t5xxl: prompt,
         guidance
       }
     },
-    '4': {
+    '6': {
       class_type: 'CLIPTextEncodeFlux',
       inputs: {
-        clip: ['1', 1],
+        clip: ['2', 0],
         clip_l: negativePrompt,
         t5xxl: negativePrompt,
         guidance
@@ -211,21 +380,21 @@ function buildFluxWorkflow(options) {
     '8': {
       class_type: 'KSampler',
       inputs: {
-        model: ['2', 0],
+        model: ['4', 0],
         seed,
         steps,
         cfg,
         sampler_name: String(options.sampler || preset.sampler),
         scheduler: String(options.scheduler || preset.scheduler),
-        positive: ['3', 0],
-        negative: ['4', 0],
-        latent_image: ['5', 0],
+        positive: ['5', 0],
+        negative: ['6', 0],
+        latent_image: ['7', 0],
         denoise: 1
       }
     },
     '9': {
       class_type: 'VAEDecode',
-      inputs: { samples: ['8', 0], vae: ['1', 2] }
+      inputs: { samples: ['8', 0], vae: ['3', 0] }
     },
     '10': {
       class_type: 'SaveImage',
@@ -238,29 +407,29 @@ function buildFluxWorkflow(options) {
     const subfolder = String(referenceImage.subfolder || '').replace(/^\/+|\/+$/g, '');
     const imageName = subfolder ? `${subfolder}/${filename}` : filename;
 
-    workflow['5'] = {
+    workflow['7'] = {
       class_type: 'LoadImage',
       inputs: { image: imageName }
     };
-    workflow['6'] = {
+    workflow['11'] = {
       class_type: 'ImageScale',
       inputs: {
-        image: ['5', 0],
+        image: ['7', 0],
         upscale_method: 'lanczos',
         width,
         height,
         crop: 'center'
       }
     };
-    workflow['7'] = {
+    workflow['12'] = {
       class_type: 'VAEEncode',
-      inputs: { pixels: ['6', 0], vae: ['1', 2] }
+      inputs: { pixels: ['11', 0], vae: ['3', 0] }
     };
-    workflow['8'].inputs.latent_image = ['7', 0];
+    workflow['8'].inputs.latent_image = ['12', 0];
     workflow['8'].inputs.denoise = referenceStrength;
   } else {
-    workflow['5'] = {
-      class_type: 'EmptyFlux2LatentImage',
+    workflow['7'] = {
+      class_type: 'EmptyLatentImage',
       inputs: { width, height, batch_size: 1 }
     };
   }
@@ -285,6 +454,101 @@ async function submitPrompt(workflow) {
   return { status: upstream.status, body };
 }
 
+function isComfyHost(request) {
+  const host = String(request.hostname || getHeader(request, 'host')).split(':')[0].toLowerCase();
+  return comfyHostnames.has(host);
+}
+
+function requestPath(request) {
+  return new URL(request.url || '/', 'http://localhost').pathname;
+}
+
+function isComfyRootPath(requestPath) {
+  return comfyRootPaths.some((rootPath) => requestPath === rootPath || requestPath.startsWith(`${rootPath}/`));
+}
+
+function rejectWebSocket(socket, statusCode = 401, message = 'Unauthorized') {
+  socket.write([
+    `HTTP/1.1 ${statusCode} ${message}`,
+    'Connection: close',
+    'Content-Type: text/plain; charset=utf-8',
+    `Content-Length: ${Buffer.byteLength(message)}`,
+    '',
+    message
+  ].join('\r\n'));
+  socket.destroy();
+}
+
+function disableWebSocketCompression(request) {
+  delete request.headers['sec-websocket-extensions'];
+}
+
+function handleComfyUpgrade(request, socket, head) {
+  const pathName = requestPath(request);
+  const isPrefixedComfy = pathName === '/comfy/ws' || pathName.startsWith('/comfy/ws/');
+  const isRootComfy = isComfyHost(request) || pathName === '/ws' || pathName.startsWith('/ws/');
+
+  if (!isPrefixedComfy && !isRootComfy) {
+    socket.destroy();
+    return;
+  }
+
+  if (!isAuthorized(request)) {
+    rejectWebSocket(socket);
+    return;
+  }
+
+  disableWebSocketCompression(request);
+
+  if (isPrefixedComfy) {
+    request.url = request.url.replace(/^\/comfy(?=\/|$)/, '') || '/';
+    comfyPrefixedProxy.upgrade(request, socket, head);
+    return;
+  }
+
+  comfyProxy.upgrade(request, socket, head);
+}
+
+app.post('/comfy/session', express.urlencoded({ extended: false, limit: '10kb' }), (request, response) => {
+  const submittedKey = String(request.body?.apiKey || '');
+  if (!apiKey || submittedKey !== apiKey) {
+    renderComfyLogin(response, sanitizeRedirect(request.body?.redirect), 'Invalid API key');
+    return;
+  }
+
+  setSessionCookie(request, response, submittedKey);
+  response.redirect(303, sanitizeRedirect(request.body?.redirect));
+});
+
+app.get('/comfy/access', (request, response) => {
+  renderComfyLogin(response, sanitizeRedirect(request.query.redirect));
+});
+
+app.get('/comfy/logout', (_request, response) => {
+  clearSessionCookie(response);
+  response.redirect(303, '/comfy/access');
+});
+
+app.use((request, response, next) => {
+  if (isComfyHost(request) && !request.path.startsWith('/v1/') && request.path !== '/health') {
+    requireComfyAuth(request, response, () => comfyProxy(request, response, next));
+    return;
+  }
+
+  next();
+});
+
+app.use((request, response, next) => {
+  if (isComfyRootPath(request.path)) {
+    requireComfyAuth(request, response, () => comfyProxy(request, response, next));
+    return;
+  }
+
+  next();
+});
+
+app.use('/comfy', requireComfyAuth, comfyPrefixedProxy);
+
 app.use(express.static(publicDir, { extensions: ['html'] }));
 
 app.get('/health', async (_request, response) => {
@@ -308,7 +572,7 @@ app.post('/v1/session', express.json({ limit: '10kb' }), (request, response) => 
 });
 
 app.delete('/v1/session', (_request, response) => {
-  response.setHeader('Set-Cookie', 'nostria_image_api_key=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+  clearSessionCookie(response);
   response.json({ ok: true });
 });
 
@@ -358,13 +622,8 @@ app.get('/v1/view', requireAuth, async (request, response) => {
   response.send(Buffer.from(await upstream.arrayBuffer()));
 });
 
-app.use('/comfy', requireAuth, createProxyMiddleware({
-  target: comfyBaseUrl,
-  changeOrigin: true,
-  pathRewrite: { '^/comfy': '' },
-  ws: true
-}));
-
-app.listen(port, '0.0.0.0', () => {
+const server = app.listen(port, '0.0.0.0', () => {
   console.log(`AI image API gateway listening on ${port}`);
 });
+
+server.on('upgrade', handleComfyUpgrade);

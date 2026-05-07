@@ -83,7 +83,9 @@ async function apiFetch(path, options = {}) {
   const contentType = response.headers.get('content-type') || '';
   const body = contentType.includes('application/json') ? await response.json() : await response.text();
   if (!response.ok) {
-    const message = typeof body === 'object' ? body.error || JSON.stringify(body) : body;
+    const message = typeof body === 'object'
+      ? typeof body.error === 'string' ? body.error : JSON.stringify(body.error || body)
+      : body;
     throw new Error(message || `Request failed with ${response.status}`);
   }
 
@@ -124,9 +126,19 @@ function renderPresets(presets) {
   elements.model.replaceChildren(...presets.map((preset) => {
     const option = document.createElement('option');
     option.value = preset.id;
-    option.textContent = preset.name;
+    option.textContent = preset.available === false ? `${preset.name} (Advanced Workflow)` : preset.name;
+    option.disabled = preset.available === false;
+    option.title = preset.unavailableReason || '';
     return option;
   }));
+
+  if (state.presets.every((preset) => preset.id !== elements.model.value || preset.available === false)) {
+    const firstAvailable = state.presets.find((preset) => preset.available !== false);
+    if (firstAvailable) {
+      elements.model.value = firstAvailable.id;
+    }
+  }
+
   applyPreset();
 }
 
@@ -140,14 +152,18 @@ function applyPreset() {
   elements.guidance.value = preset.guidance;
   elements.cfg.value = preset.cfg;
   elements.size.value = `${preset.width}x${preset.height}`;
+  elements.generateButton.disabled = preset.available === false;
+  if (preset.available === false) {
+    setStatus(preset.unavailableReason || 'Use Advanced Workflow for this model');
+  }
 }
 
 async function loadConfig() {
   if (!state.apiKey) {
     renderPresets([
       { id: 'flux1-schnell', name: 'FLUX.1 schnell', width: 1024, height: 1024, steps: 4, guidance: 3.5, cfg: 1 },
-      { id: 'flux2-klein', name: 'FLUX.2 klein 4B', width: 1024, height: 1024, steps: 8, guidance: 3.5, cfg: 1 },
-      { id: 'z-image-turbo', name: 'Z-Image-Turbo', width: 1024, height: 1024, steps: 8, guidance: 3.5, cfg: 1 }
+      { id: 'flux2-klein', name: 'FLUX.2 klein 4B', available: false, width: 1024, height: 1024, steps: 8, guidance: 3.5, cfg: 1 },
+      { id: 'z-image-turbo', name: 'Z-Image-Turbo', available: false, width: 1024, height: 1024, steps: 8, guidance: 3.5, cfg: 1 }
     ]);
     return;
   }
